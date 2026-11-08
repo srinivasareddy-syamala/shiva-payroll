@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="text-center mt-20">
+  <h1 class="text-3xl font-bold text-slate-700">Not allowed</h1>
+  <p class="text-slate-500 mt-2">Only the owner can open this page.</p>
+  <a href="{{ url_for('main.dashboard') }}" class="inline-block mt-6 text-blue-700 underline">Back to dashboard</a>
+</div>
+{% endblock %}

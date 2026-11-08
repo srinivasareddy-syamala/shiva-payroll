@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "vehicles/_status.html" import badge %}
+{% block content %}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-blue-950">🚚 {{ v.number }}</h1>
+    <p class="text-sm text-slate-500">{{ v.vehicle_type }}{% if v.model %} · {{ v.model }}{% endif %}{% if v.capacity %} · {{ v.capacity }}{% endif %}
+      {% if v.driver %} · Driver: <a class="text-blue-700" href="{{ url_for('employees.ledger', emp_id=v.driver_id) }}">{{ v.driver.name }}</a>{% endif %}
+      {% if not v.active %} · <span class="text-red-600">Inactive</span>{% endif %}</p>
+    {% if v.notes %}<p class="text-xs text-slate-500 mt-1">📝 {{ v.notes }}</p>{% endif %}
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></form>
+    <a href="{{ url_for('vehicles.expense_new', vehicle=v.id) }}" class="bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">+ Expense</a>
+    <a href="{{ url_for('vehicles.edit', vid=v.id) }}" class="border border-slate-300 bg-white rounded-lg px-4 py-2 text-sm">Edit</a>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+  {% for cat, icon in categories.items() %}
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3">
+    <div class="text-[11px] uppercase text-slate-500">{{ icon }} {{ cat }}</div>
+    <div class="text-lg font-bold">{{ by_cat[cat]|inr }}</div>
+  </div>
+  {% endfor %}
+  <div class="bg-blue-900 text-white rounded-2xl p-3">
+    <div class="text-[11px] uppercase text-blue-200">Total · {{ month_label }}</div>
+    <div class="text-lg font-bold">{{ total|inr }}</div>
+  </div>
+</div>
+<div class="flex flex-wrap gap-4 text-sm text-slate-600 mb-6 bg-white rounded-xl border border-slate-200 px-4 py-3">
+  <span>⛽ Diesel: <b>{{ litres|days }} L</b>{% if litres %} · avg ₹{{ '%.2f'|format(by_cat['Diesel'] / litres) }}/L{% endif %}</span>
+  <span>🛣️ Km (from odometer): <b>{{ km if km else '—' }}</b></span>
+  <span>📈 Mileage: <b>{{ (kmpl ~ ' km/L') if kmpl else '—' }}</b></span>
+  <span>🐔 Birds loaded: <b>{{ birds or '—' }}</b>{% if per_bird %} · ₹{{ per_bird }}/bird{% endif %}</span>
+  <span class="text-xs text-slate-400 self-center">Only approved entries are counted.</span>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+  {% for e in expenses %}
+  <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 {{ 'bg-amber-50/50' if e.status == 'Pending' }}">
+    <div>
+      <b>{{ e.date.strftime('%d %b') }}</b> · {{ categories[e.category] }} {{ e.category }}
+      <span class="text-slate-500">
+        {% if e.litres %}· {{ e.litres|days }} L{% endif %}{% if e.birds %}· {{ e.birds }} birds{% endif %}{% if e.odometer %} · {{ e.odometer }} km{% endif %}{% if e.vendor %} · {{ e.vendor }}{% endif %}</span>
+      {% if e.description %}<div class="text-xs text-slate-400">{{ e.description }}</div>{% endif %}
+    </div>
+    <div class="flex items-center gap-3 whitespace-nowrap">
+      {{ badge(e.status) }}
+      {% if e.slip_file %}<a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700 text-xs">📎 Slip</a>{% endif %}
+      <b>{{ e.amount|inr }}</b>
+      <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.full_path) }}" class="text-blue-700 text-xs">Edit</a>
+      <form method="post" action="{{ url_for('vehicles.expense_delete', eid=e.id) }}" onsubmit="return confirm('Delete this expense?')"><button class="text-red-500 text-xs">Delete</button></form>
+    </div>
+  </div>
+  {% else %}
+  <div class="px-4 py-8 text-center text-slate-400">No expenses in {{ month_label }}.</div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-blue-950 mb-3">Settings</h1>
+{% include "_settings_tabs.html" %}
+<p class="text-sm text-slate-500 mb-6"><b>Owner</b>: full access. <b>Supervisor</b>: marks attendance and submits vehicle expenses (diesel, repair, loading) for your approval.</p>
+<div class="grid lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 space-y-3">
+    {% for u in users %}
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 {{ 'opacity-60' if not u.active }}">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-9 h-9 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold uppercase">{{ u.username[0] }}</span>
+          <span class="font-semibold">{{ u.username }}</span>
+          <span class="text-xs px-2 py-0.5 rounded-full {{ 'bg-blue-700 text-white' if u.is_owner else 'bg-slate-100 text-slate-700' }}">{{ u.role }}</span>
+          {% if not u.active %}<span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">disabled</span>{% endif %}
+          {% if u.id == current_user.id %}<span class="text-xs text-slate-400">(you)</span>{% endif %}
+        </div>
+        {% if u.id != current_user.id %}
+        <div class="flex flex-wrap gap-2">
+          <form method="post" action="{{ url_for('auth.user_update', uid=u.id) }}">
+            <input type="hidden" name="action" value="role">
+            <input type="hidden" name="role" value="{{ 'supervisor' if u.is_owner else 'owner' }}">
+            <button class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 hover:bg-slate-50">Make {{ 'supervisor' if u.is_owner else 'owner' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('auth.user_update', uid=u.id) }}">
+            <input type="hidden" name="action" value="toggle">
+            <button class="text-xs border border-amber-300 text-amber-700 rounded-lg px-2.5 py-1.5 hover:bg-amber-50">{{ 'Disable' if u.active else 'Enable' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('auth.user_update', uid=u.id) }}" onsubmit="return confirm('Delete user {{ u.username }}?')">
+            <input type="hidden" name="action" value="delete">
+            <button class="text-xs border border-red-300 text-red-600 rounded-lg px-2.5 py-1.5 hover:bg-red-50">Delete</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('auth.user_update', uid=u.id) }}" class="flex flex-wrap gap-2 mt-3">
+        <input type="hidden" name="action" value="password">
+        <input name="password" type="text" autocomplete="off" placeholder="New password (min 6)" required minlength="6"
+               class="flex-1 min-w-[180px] border border-slate-300 rounded-lg px-3 py-1.5 text-sm">
+        <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-3 py-1.5 text-sm font-semibold">Set password</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-3 h-fit">
+    <h2 class="font-semibold text-blue-900">Add user</h2>
+    <input name="username" placeholder="Username" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+    <input name="password" type="text" autocomplete="off" placeholder="Password (min 6)" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+    <select name="role" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+      <option value="supervisor">Supervisor — attendance &amp; expenses</option>
+      <option value="owner">Owner — full access</option>
+    </select>
+    <button class="w-full bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-4 py-2 font-semibold">Create user</button>
+  </form>
+</div>
+{% endblock %}

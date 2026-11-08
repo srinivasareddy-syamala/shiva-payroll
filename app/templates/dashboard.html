@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center gap-4 mb-6">
+  <img src="{{ url_for('static', filename='logo-icon.png') }}" alt="" class="w-14 h-14 rounded-full bg-white shadow ring-2 ring-orange-400 hidden sm:block">
+  <div>
+    <h1 class="text-2xl font-bold text-blue-950">Welcome, {{ current_user.username }}</h1>
+    <p class="text-slate-500">{{ today.strftime('%A, %d %B %Y') }}</p>
+  </div>
+</div>
+
+{% macro card(label, value, color='blue', icon='') -%}
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 border-l-4 border-l-{{ color }}-500">
+  <div class="text-xs uppercase tracking-wide text-slate-500">{{ icon }} {{ label }}</div>
+  <div class="text-2xl font-bold mt-1 text-slate-800">{{ value }}</div>
+</div>
+{%- endmacro %}
+
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+  {{ card('Active employees', stats.active, 'blue', '👥') }}
+  {{ card('Present today', stats.present_today ~ ' / ' ~ stats.active, 'emerald', '✅') }}
+  {{ card('Attendance marked', stats.marked_today ~ ' / ' ~ stats.active, 'amber' if stats.marked_today < stats.active else 'emerald', '📋') }}
+  {% if current_user.is_owner %}
+    {{ card('Advances this month', stats.advances_month|inr, 'orange', '💵') }}
+    {{ card('Salary paid this month', stats.salary_month|inr, 'indigo', '🧾') }}
+    {{ card('Advance outstanding', stats.advance_outstanding|inr, 'red', '⚠️') }}
+  {% endif %}
+</div>
+
+{% if current_user.is_owner and pending_approvals %}
+<a href="{{ url_for('vehicles.approvals') }}" class="flex items-center justify-between mb-6 rounded-2xl px-5 py-4 bg-orange-50 border border-orange-200 text-orange-800 shadow-sm">
+  <span>⏳ <b>{{ pending_approvals }}</b> vehicle expense{{ 's' if pending_approvals != 1 }} (diesel bills etc.) waiting for approval</span>
+  <span class="font-semibold">Review →</span>
+</a>
+{% endif %}
+
+<div class="grid sm:grid-cols-2 gap-4">
+  <a href="{{ url_for('vehicles.expense_new', category='Diesel') }}" class="block bg-gradient-to-br from-amber-500 to-orange-600 hover:from-amber-600 text-white rounded-2xl p-5 shadow-md sm:order-last">
+    <div class="text-lg font-semibold">⛽ Diesel / vehicle expense</div>
+    <div class="text-amber-50 text-sm">Diesel slip, repair, loading cost</div>
+  </a>
+  <a href="{{ url_for('attendance.daily') }}" class="block bg-gradient-to-br from-blue-700 to-blue-900 hover:from-blue-800 text-white rounded-2xl p-5 shadow-md">
+    <div class="text-lg font-semibold">📋 Mark today's attendance</div>
+    <div class="text-blue-100 text-sm">P / ½ / A, overtime and driver DA</div>
+  </a>
+  {% if current_user.is_owner %}
+  <a href="{{ url_for('advances.index') }}" class="block bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 text-white rounded-2xl p-5 shadow-md">
+    <div class="text-lg font-semibold">💵 Give advance</div>
+    <div class="text-orange-100 text-sm">Record cash / UPI advance</div>
+  </a>
+  <a href="{{ url_for('salary.run') }}" class="block bg-gradient-to-br from-indigo-600 to-indigo-800 hover:from-indigo-700 text-white rounded-2xl p-5 shadow-md">
+    <div class="text-lg font-semibold">🧾 Month-end salary</div>
+    <div class="text-indigo-100 text-sm">Auto-calculated · slips · WhatsApp</div>
+  </a>
+  <a href="{{ url_for('employees.new') }}" class="block bg-gradient-to-br from-sky-500 to-sky-700 hover:from-sky-600 text-white rounded-2xl p-5 shadow-md">
+    <div class="text-lg font-semibold">➕ Add employee</div>
+    <div class="text-sky-100 text-sm">Driver or worker</div>
+  </a>
+  {% endif %}
+</div>
+
+{% if current_user.is_owner and stats.recent_advances %}
+<h2 class="text-lg font-semibold mt-8 mb-3 text-blue-950">Recent advances</h2>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y">
+  {% for a in stats.recent_advances %}
+  <div class="flex justify-between px-4 py-3 text-sm">
+    <span><a class="text-blue-700 font-medium" href="{{ url_for('employees.ledger', emp_id=a.employee_id) }}">{{ a.employee.name }}</a>
+      <span class="text-slate-400 ml-2">{{ a.date.strftime('%d %b') }}</span></span>
+    <span class="font-semibold">{{ a.amount|inr }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

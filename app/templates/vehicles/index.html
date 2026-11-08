@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <div>
+    <h1 class="text-2xl font-bold text-blue-950">Vehicles</h1>
+    {% if current_user.is_owner %}<p class="text-sm text-slate-500">Approved expenses for {{ month_label }}</p>{% endif %}
+  </div>
+  <div class="flex flex-wrap gap-2">
+    {% if current_user.is_owner %}
+    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></form>
+    <a href="{{ url_for('vehicles.new') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">+ Add vehicle</a>
+    {% endif %}
+    <a href="{{ url_for('vehicles.expenses') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">{{ 'All expenses' if current_user.is_owner else 'My entries' }}</a>
+  </div>
+</div>
+
+<!-- Quick add buttons -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+  {% set qa = [('Diesel', 'from-amber-500 to-orange-600', 'Bill slip + approval'), ('Repair', 'from-slate-600 to-slate-800', 'Garage / spare parts'),
+               ('Loading', 'from-rose-500 to-red-700', 'Lifting birds into vehicle'), ('Other', 'from-sky-500 to-blue-700', 'Toll, parking, misc.')] %}
+  {% for cat, grad, sub in qa %}
+  <a href="{{ url_for('vehicles.expense_new', category=cat) }}" class="block bg-gradient-to-br {{ grad }} text-white rounded-2xl p-4 shadow-md hover:opacity-95">
+    <div class="text-lg font-semibold">{{ categories[cat] }} + {{ cat }}</div>
+    <div class="text-xs text-white/80">{{ sub }}</div>
+  </a>
+  {% endfor %}
+</div>
+
+{% if current_user.is_owner and pending %}
+<a href="{{ url_for('vehicles.approvals') }}" class="flex items-center justify-between mb-6 rounded-xl px-4 py-3 bg-orange-50 border border-orange-200 text-orange-800">
+  <span>⏳ <b>{{ pending }}</b> expense{{ 's' if pending != 1 }} waiting for your approval</span><span class="font-semibold">Review →</span>
+</a>
+{% endif %}
+
+{% if current_user.is_owner %}
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  {% for cat, icon in categories.items() %}
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3">
+    <div class="text-[11px] uppercase text-slate-500">{{ icon }} {{ cat }}</div>
+    <div class="text-lg font-bold">{{ grand[cat]|inr }}</div>
+  </div>
+  {% endfor %}
+  <div class="bg-blue-900 text-white rounded-2xl shadow-sm p-3">
+    <div class="text-[11px] uppercase text-blue-200">Total</div>
+    <div class="text-lg font-bold">{{ grand.total|inr }}</div>
+  </div>
+</div>
+{% endif %}
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-blue-900 text-blue-50 text-left">
+      <tr>
+        <th class="px-4 py-3">Vehicle</th><th class="px-4 py-3">Driver</th>
+        {% if current_user.is_owner %}
+        <th class="px-4 py-3 text-right">Diesel</th><th class="px-4 py-3 text-right">Litres</th>
+        <th class="px-4 py-3 text-right">Repair</th><th class="px-4 py-3 text-right">Loading</th>
+        <th class="px-4 py-3 text-right">Other</th><th class="px-4 py-3 text-right">Total</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for v in vehicles %}
+      {% set t = totals.get(v.id, {}) %}
+      <tr class="{{ 'opacity-50' if not v.active }}">
+        <td class="px-4 py-3">
+          {% if current_user.is_owner %}<a href="{{ url_for('vehicles.detail', vid=v.id, month=month_value) }}" class="font-semibold text-blue-700">{{ v.number }}</a>
+          {% else %}<span class="font-semibold">{{ v.number }}</span>{% endif %}
+          <div class="text-xs text-slate-400">{{ v.vehicle_type }}{% if v.model %} · {{ v.model }}{% endif %}{% if not v.active %} · inactive{% endif %}</div>
+        </td>
+        <td class="px-4 py-3">{{ v.driver.name if v.driver else '—' }}</td>
+        {% if current_user.is_owner %}
+        <td class="px-4 py-3 text-right">{{ t.get('Diesel', 0)|inr }}</td>
+        <td class="px-4 py-3 text-right text-slate-500">{{ t.get('litres', 0)|days }}</td>
+        <td class="px-4 py-3 text-right">{{ t.get('Repair', 0)|inr }}</td>
+        <td class="px-4 py-3 text-right">{{ t.get('Loading', 0)|inr }}</td>
+        <td class="px-4 py-3 text-right">{{ t.get('Other', 0)|inr }}</td>
+        <td class="px-4 py-3 text-right font-bold">{{ t.get('total', 0)|inr }}</td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No vehicles yet.
+        {% if current_user.is_owner %}<a href="{{ url_for('vehicles.new') }}" class="text-blue-700 underline">Add the first vehicle</a>{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

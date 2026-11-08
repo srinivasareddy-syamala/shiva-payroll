@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-blue-950 mb-3">Settings</h1>
+{% include "_settings_tabs.html" %}
+{% set inp = "w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" %}
+<div class="grid md:grid-cols-2 gap-6">
+  <form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+    <input type="hidden" name="form" value="company">
+    <h2 class="font-semibold text-blue-900">Company details <span class="text-xs font-normal text-slate-500">(shown on salary slips &amp; WhatsApp)</span></h2>
+    <div><label class="block text-sm font-medium mb-1">Company name</label>
+      <input name="company_name" value="{{ st.company_name }}" class="{{ inp }}"></div>
+    <div><label class="block text-sm font-medium mb-1">Address</label>
+      <textarea name="company_address" rows="2" class="{{ inp }}">{{ st.company_address }}</textarea></div>
+    <div><label class="block text-sm font-medium mb-1">Phone</label>
+      <input name="company_phone" value="{{ st.company_phone }}" class="{{ inp }}"></div>
+    <div><label class="block text-sm font-medium mb-1">Note at bottom of slip (optional)</label>
+      <input name="slip_note" value="{{ st.slip_note }}" placeholder="e.g. Thank you for your hard work" class="{{ inp }}"></div>
+    <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-5 py-2 font-semibold">Save</button>
+  </form>
+
+  <form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4 h-fit">
+    <input type="hidden" name="form" value="password">
+    <h2 class="font-semibold text-blue-900">Change my password</h2>
+    <input name="current" type="password" placeholder="Current password" required class="{{ inp }}">
+    <input name="new" type="password" placeholder="New password (min 6)" required class="{{ inp }}">
+    <input name="confirm" type="password" placeholder="Repeat new password" required class="{{ inp }}">
+    <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-5 py-2 font-semibold">Change password</button>
+  </form>
+</div>
+{% endblock %}

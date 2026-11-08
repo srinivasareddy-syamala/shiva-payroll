@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <a href="{{ back or url_for('salary.run', month='%04d-%02d'|format(p.year, p.month)) }}" class="text-sm text-blue-700">← Back</a>
+  <h1 class="text-2xl font-bold text-blue-950 mt-2 mb-1">Send slip on WhatsApp</h1>
+  <p class="text-slate-500 text-sm mb-5">{{ p.employee.name }} ·
+    {% if number %}<span class="text-emerald-700 font-semibold">+{{ number }}</span>
+    {% else %}<span class="text-red-600">No WhatsApp / phone number saved —
+      <a class="underline" href="{{ url_for('employees.edit', emp_id=p.employee_id) }}">add it</a>, or choose the contact in WhatsApp.</span>{% endif %}</p>
+
+  <div class="grid sm:grid-cols-2 gap-3 mb-5">
+    <a href="{{ wa_url }}" target="_blank" rel="noopener"
+       class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 font-semibold shadow">
+      <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.8.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/></svg>
+      Send message on WhatsApp</a>
+    <button type="button" id="sharePdf"
+       class="flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl py-3 font-semibold shadow">
+      📄 Share PDF slip</button>
+  </div>
+  <p id="shareHelp" class="text-xs text-slate-500 mb-5 -mt-3">
+    <b>Send message</b> opens WhatsApp (app or WhatsApp Web) with the slip details already typed — just press send.
+    <b>Share PDF</b> on a phone lets you pick WhatsApp and attach the PDF; on a computer it downloads the PDF so you can attach it in WhatsApp Web.
+  </p>
+
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-sm font-semibold text-slate-600">Message preview</span>
+      <button type="button" id="copyBtn" class="text-xs text-blue-700">Copy text</button>
+    </div>
+    <pre id="msg" class="whitespace-pre-wrap text-sm font-sans text-slate-800 bg-emerald-50 rounded-xl p-4 border border-emerald-100">{{ text }}</pre>
+  </div>
+  <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="inline-block mt-4 text-sm text-blue-700 underline">Open PDF slip</a>
+</div>
+
+<script>
+const pdfUrl = "{{ url_for('salary.slip', payment_id=p.id) }}";
+const fileName = "{{ filename }}";
+document.getElementById('sharePdf').addEventListener('click', async () => {
+  try {
+    const blob = await (await fetch(pdfUrl)).blob();
+    const file = new File([blob], fileName, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: fileName, text: document.getElementById('msg').innerText });
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = fileName; a.click();
+    document.getElementById('shareHelp').innerHTML =
+      '<b class="text-emerald-700">PDF downloaded.</b> Now press “Send message on WhatsApp” and attach the downloaded file (📎 → Document).';
+  } catch (e) { if (e.name !== 'AbortError') alert('Could not share: ' + e.message); }
+});
+document.getElementById('copyBtn').addEventListener('click', () => {
+  navigator.clipboard?.writeText(document.getElementById('msg').innerText);
+  document.getElementById('copyBtn').textContent = 'Copied ✓';
+});
+</script>
+{% endblock %}

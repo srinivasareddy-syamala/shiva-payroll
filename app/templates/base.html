@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <title>{% block title %}{{ company_name }}{% endblock %} · Payroll</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='logo-192.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}?v=2">
+  <style>
+    input[type=radio].att:checked + span { color: #fff; }
+    input[type=radio].att-P:checked + span { background: #16a34a; border-color: #16a34a; }
+    input[type=radio].att-H:checked + span { background: #f59e0b; border-color: #f59e0b; }
+    input[type=radio].att-A:checked + span { background: #dc2626; border-color: #dc2626; }
+    input[type=radio].att-L:checked + span { background: #2563eb; border-color: #2563eb; }
+    @media print { nav, .no-print { display: none !important; } body { background: #fff; } }
+  </style>
+</head>
+<body class="bg-gradient-to-b from-blue-50 to-slate-50 text-slate-800 min-h-screen">
+{% if current_user.is_authenticated %}
+<nav class="bg-gradient-to-r from-blue-950 via-blue-900 to-blue-700 text-white shadow-lg">
+  <div class="max-w-6xl mx-auto px-4">
+    <div class="flex items-center justify-between h-16">
+      <a href="{{ url_for('main.dashboard') }}" class="flex items-center gap-3">
+        <span class="bg-white rounded-full p-0.5 shadow ring-2 ring-orange-400">
+          <img src="{{ url_for('static', filename='logo-icon.png') }}" alt="" class="w-10 h-10 rounded-full"></span>
+        <span class="font-bold text-lg leading-tight whitespace-nowrap">{{ company_name }}<br>
+          <span class="text-xs font-normal text-blue-200">Payroll &amp; Vehicles</span></span>
+      </a>
+      <button onclick="document.getElementById('menu').classList.toggle('hidden')"
+              class="lg:hidden p-2 rounded hover:bg-blue-800 text-xl" aria-label="Menu">☰</button>
+      <div class="hidden lg:flex items-center gap-0.5 text-sm whitespace-nowrap">
+        {% include "_nav_links.html" %}
+      </div>
+    </div>
+    <div id="menu" class="hidden lg:hidden pb-3 flex flex-col gap-1 text-sm">
+      {% include "_nav_links.html" %}
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<main class="max-w-6xl mx-auto px-4 py-6">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="mb-4 rounded-xl px-4 py-3 text-sm shadow-sm
+                  {{ 'bg-red-50 text-red-700 border border-red-200' if cat == 'error'
+                     else 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="text-center text-xs text-slate-400 pb-6 no-print">{{ company_name }} · Payroll</footer>
+</body>
+</html>

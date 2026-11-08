@@ -1,0 +1,35 @@
+# Render Blueprint: creates the PostgreSQL database + the app (built from the Dockerfile).
+# Render > New > Blueprint > pick this GitHub repo. Every push to GitHub redeploys automatically.
+services:
+  - type: web
+    name: shiva-payroll
+    runtime: docker
+    plan: free
+    region: singapore            # closest Render region to India
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: shiva-payroll-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: COMPANY_NAME
+        value: Shiva Agrovet
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASSWORD      # Render asks you for this when creating the Blueprint
+        sync: false
+      - key: TZ
+        value: IST-5:30
+      - key: UPLOAD_FOLDER
+        value: /app/uploads
+
+databases:
+  - name: shiva-payroll-db
+    plan: free
+    region: singapore
+    databaseName: shiva_payroll
+    user: shiva

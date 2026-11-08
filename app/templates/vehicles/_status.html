@@ -1,0 +1,4 @@
+{% macro badge(s) -%}
+<span class="inline-block text-xs font-semibold px-2 py-0.5 rounded-full
+  {{ {'Approved': 'bg-emerald-100 text-emerald-800', 'Pending': 'bg-amber-100 text-amber-800', 'Rejected': 'bg-red-100 text-red-700'}[s] }}">{{ s }}</span>
+{%- endmacro %}

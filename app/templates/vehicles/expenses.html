@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "vehicles/_status.html" import badge %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <h1 class="text-2xl font-bold text-blue-950">{{ 'Vehicle expenses' if current_user.is_owner else 'My vehicle entries' }} — {{ month_label }}</h1>
+  <div class="flex gap-2">
+    <a href="{{ url_for('vehicles.expense_new') }}" class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-4 py-2 text-sm font-semibold">+ Add expense</a>
+    {% if current_user.is_owner %}
+    <a href="{{ url_for('vehicles.expenses_excel', **args) }}" class="bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm">⬇ Excel</a>
+    {% endif %}
+  </div>
+</div>
+
+<form class="flex flex-wrap gap-2 mb-4 text-sm">
+  <input type="month" name="month" value="{{ month_value }}" class="border border-slate-300 rounded-lg px-3 py-2">
+  <select name="vehicle" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">All vehicles</option>
+    {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if args.get('vehicle') == v.id|string }}>{{ v.number }}</option>{% endfor %}</select>
+  <select name="category" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">All types</option>
+    {% for c in categories %}<option {{ 'selected' if args.get('category') == c }}>{{ c }}</option>{% endfor %}</select>
+  <select name="status" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">Any status</option>
+    {% for s in ['Pending', 'Approved', 'Rejected'] %}<option {{ 'selected' if args.get('status') == s }}>{{ s }}</option>{% endfor %}</select>
+  <button class="border border-slate-300 bg-white rounded-lg px-4 py-2">Filter</button>
+</form>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-blue-900 text-blue-50 text-left">
+      <tr><th class="px-3 py-3">Date</th><th class="px-3 py-3">Vehicle</th><th class="px-3 py-3">Type</th><th class="px-3 py-3">Details</th>
+          <th class="px-3 py-3 text-right">Amount</th><th class="px-3 py-3">Slip</th><th class="px-3 py-3">Status</th><th class="px-3 py-3"></th></tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for e in items %}
+      <tr class="{{ 'bg-amber-50/50' if e.status == 'Pending' }}">
+        <td class="px-3 py-2 whitespace-nowrap">{{ e.date.strftime('%d %b') }}</td>
+        <td class="px-3 py-2 font-semibold whitespace-nowrap">{{ e.vehicle.number }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ categories[e.category] }} {{ e.category }}</td>
+        <td class="px-3 py-2 text-slate-600">
+          {% if e.category == 'Diesel' and e.litres %}{{ e.litres|days }} L @ ₹{{ e.rate_per_litre }}{% endif %}
+          {% if e.category == 'Loading' and e.birds %}{{ e.birds }} birds{% if e.labourers %} · {{ e.labourers }} workers{% endif %}{% endif %}
+          {% if e.odometer %} · {{ e.odometer }} km{% endif %}
+          {% if e.vendor %} · {{ e.vendor }}{% endif %}
+          {% if e.description %}<div class="text-xs text-slate-400">{{ e.description }}</div>{% endif %}
+          {% if e.status == 'Rejected' and e.review_note %}<div class="text-xs text-red-600">Reason: {{ e.review_note }}</div>{% endif %}
+          {% if current_user.is_owner and e.submitter %}<div class="text-[11px] text-slate-400">by {{ e.submitter.username }}</div>{% endif %}
+        </td>
+        <td class="px-3 py-2 text-right font-semibold whitespace-nowrap">{{ e.amount|inr }}</td>
+        <td class="px-3 py-2">{% if e.slip_file %}<a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700">📎 View</a>{% else %}<span class="text-slate-300">—</span>{% endif %}</td>
+        <td class="px-3 py-2">{{ badge(e.status) }}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-right">
+          {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status != 'Approved') %}
+            <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.full_path) }}" class="text-blue-700 text-xs">Edit</a>
+          {% endif %}
+          {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status == 'Pending') %}
+            <form method="post" action="{{ url_for('vehicles.expense_delete', eid=e.id) }}" class="inline" onsubmit="return confirm('Delete this expense?')">
+              <button class="text-red-500 text-xs ml-2">Delete</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No expenses for this filter.</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if items %}
+    <tfoot class="bg-slate-50 font-bold"><tr><td colspan="4" class="px-3 py-2 text-right">Approved total</td><td class="px-3 py-2 text-right">{{ total|inr }}</td><td colspan="3"></td></tr></tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endblock %}

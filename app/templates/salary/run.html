@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+  <h1 class="text-2xl font-bold">Salary — {{ month_label }}</h1>
+  <div class="flex items-center gap-2">
+    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border rounded-lg px-3 py-2"></form>
+    <a href="{{ url_for('salary.register', month=month_value) }}" class="border bg-white rounded-lg px-3 py-2 text-sm">Register</a>
+  </div>
+</div>
+<p class="text-sm text-slate-500 mb-4">Earned, OT and DA are calculated from attendance. Advance deduction is pre-filled with the outstanding balance (capped at gross) — change it if you want to recover in instalments. Tick the employees to pay and press Save.</p>
+
+{% set num = "w-20 border rounded px-2 py-1 text-right" %}
+<form method="post">
+  <input type="hidden" name="month" value="{{ month_value }}">
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-blue-900 text-blue-50 text-left">
+        <tr>
+          <th class="px-3 py-2"><input type="checkbox" onclick="document.querySelectorAll('.paychk').forEach(c=>c.checked=this.checked)"></th>
+          <th class="px-3 py-2">Employee</th>
+          <th class="px-3 py-2 text-right">Days</th>
+          <th class="px-3 py-2 text-right">Earned</th>
+          <th class="px-3 py-2 text-right">OT</th>
+          <th class="px-3 py-2 text-right text-orange-700">DA</th>
+          <th class="px-3 py-2 text-right">Bonus</th>
+          <th class="px-3 py-2 text-right">Adv. due</th>
+          <th class="px-3 py-2 text-right">Adv. deduct</th>
+          <th class="px-3 py-2 text-right">Other ded.</th>
+          <th class="px-3 py-2 text-right">Net</th>
+          <th class="px-3 py-2">Mode</th>
+          <th class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y">
+        {% for e, c in rows %}
+        {% set p = c.existing %}
+        <tr class="{{ 'bg-amber-50' if c.stale else ('bg-emerald-50' if p) }}" data-row data-gross="{{ c.gross }}">
+          <td class="px-3 py-2"><input type="checkbox" name="pay" value="{{ e.id }}" class="paychk" {{ 'checked' if not p or c.stale }}></td>
+          <td class="px-3 py-2">
+            <a href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}" class="font-medium text-blue-700">{{ e.name }}</a>
+            <div class="text-xs text-slate-400">{{ e.rate|inr }}/{{ 'mo' if e.pay_type == 'Monthly' else 'day' }}
+              {% if c.marked_days < c.days_in_month %}<span class="text-amber-600">· {{ c.days_in_month - c.marked_days }} day{{ 's' if c.days_in_month - c.marked_days != 1 }} unmarked</span>{% endif %}</div>
+          </td>
+          <td class="px-3 py-2 text-right">{{ c.paid_days|days }}/{{ c.days_in_month }}</td>
+          <td class="px-3 py-2 text-right">{{ c.earned|inr }}</td>
+          <td class="px-3 py-2 text-right">{{ c.ot_amount|inr }}<div class="text-xs text-slate-400">{{ c.ot_hours|days }}h</div></td>
+          <td class="px-3 py-2 text-right text-orange-700">{{ c.da_amount|inr }}{% if c.da_days %}<div class="text-xs text-slate-400">{{ c.da_days }} day{{ 's' if c.da_days != 1 }}</div>{% endif %}</td>
+          <td class="px-3 py-2 text-right"><input name="bonus_{{ e.id }}" value="{{ p.bonus if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="bonus"></td>
+          <td class="px-3 py-2 text-right text-red-600">{{ c.advance_outstanding|inr }}</td>
+          <td class="px-3 py-2 text-right"><input name="adv_{{ e.id }}" value="{{ p.advance_deducted if p else c.suggested_advance }}" inputmode="decimal" class="{{ num }} calc" data-k="adv"></td>
+          <td class="px-3 py-2 text-right"><input name="other_{{ e.id }}" value="{{ p.other_deductions if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="other"></td>
+          <td class="px-3 py-2 text-right font-bold net"></td>
+          <td class="px-3 py-2">
+            <select name="mode_{{ e.id }}" class="border rounded px-1 py-1">
+              {% for m in ['Cash', 'UPI', 'Bank'] %}<option {{ 'selected' if p and p.payment_mode == m }}>{{ m }}</option>{% endfor %}
+            </select>
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap">
+            {% if p %}
+              {% if c.stale %}<div class="text-xs text-amber-700 font-semibold">⚠ attendance changed — Save again</div>{% else %}<span class="text-xs text-emerald-700">✓ paid</span>{% endif %}
+              <div class="flex gap-2 mt-1">
+                <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="text-blue-700 text-xs">Slip</a>
+                <a href="{{ url_for('salary.share', payment_id=p.id) }}" class="text-emerald-600 text-xs font-semibold">WhatsApp</a>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="13" class="px-4 py-8 text-center text-slate-400">No active employees.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="bg-slate-50 font-bold">
+        <tr><td colspan="10" class="px-3 py-2 text-right">Total net (ticked rows)</td><td class="px-3 py-2 text-right" id="grand"></td><td colspan="2"></td></tr>
+      </tfoot>
+    </table>
+  </div>
+  <div class="flex flex-wrap items-center gap-3 mt-4">
+    <label class="text-sm">Paid on <input type="date" name="paid_on" value="{{ today.isoformat() }}" class="border rounded-lg px-3 py-2 ml-1"></label>
+    <button class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-2 font-semibold">Save salary for ticked</button>
+    <span class="text-xs text-slate-500">Saving a paid row again updates it.</span>
+  </div>
+</form>
+
+<script>
+const fmt = n => '₹' + n.toLocaleString('en-IN', Number.isInteger(Math.round(n * 100) / 100) ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2});
+function recalc() {
+  let grand = 0;
+  document.querySelectorAll('tr[data-row]').forEach(tr => {
+    const v = k => parseFloat(tr.querySelector(`[data-k=${k}]`).value) || 0;
+    const net = parseFloat(tr.dataset.gross) + v('bonus') - v('adv') - v('other');
+    tr.querySelector('.net').textContent = fmt(net);
+    tr.querySelector('.net').classList.toggle('text-red-600', net < 0);
+    if (tr.querySelector('.paychk').checked) grand += net;
+  });
+  document.getElementById('grand').textContent = fmt(grand);
+}
+document.querySelectorAll('.calc, .paychk').forEach(el => el.addEventListener('input', recalc));
+document.querySelectorAll('.paychk, thead input').forEach(el => el.addEventListener('change', recalc));
+recalc();
+</script>
+{% endblock %}

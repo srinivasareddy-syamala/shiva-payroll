@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <h1 class="text-2xl font-bold">Attendance — {{ month_label }}</h1>
+  <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border rounded-lg px-3 py-2"></form>
+</div>
+{% set colors = {'P': 'bg-green-500 text-white', 'H': 'bg-amber-400 text-white', 'A': 'bg-red-500 text-white', 'L': 'bg-blue-500 text-white'} %}
+<p class="text-xs text-slate-500 mb-2"><span class="inline-block w-2.5 h-2.5 rounded-full bg-orange-500 align-middle"></span> = DA given that day. Click a name to edit or delete days.</p>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+  <table class="text-xs">
+    <thead class="bg-blue-900 text-blue-50">
+      <tr>
+        <th class="px-3 py-2 text-left sticky left-0 bg-blue-900">Name</th>
+        {% for d in days %}<th class="px-1 py-2 w-7 text-center">{{ d }}</th>{% endfor %}
+        <th class="px-3 py-2">Paid days</th>
+        <th class="px-3 py-2">DA</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for e in employees %}
+      <tr>
+        <td class="px-3 py-1 font-medium whitespace-nowrap sticky left-0 bg-white">{% if current_user.is_owner %}<a class="text-blue-700" href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}">{{ e.name }}</a>{% else %}{{ e.name }}{% endif %}</td>
+        {% for d in days %}
+          {% set s = grid.get((e.id, d)) %}
+          <td class="px-0.5 py-1 text-center">
+            <span class="relative inline-block w-6 h-6 leading-6 rounded {{ colors[s] if s else 'text-slate-300' }}">{{ s or '·' }}{% if (e.id, d) in da_days %}<span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-orange-500 ring-2 ring-white" title="DA"></span>{% endif %}</span>
+          </td>
+        {% endfor %}
+        <td class="px-3 py-1 text-center font-bold">{{ totals[e.id]|days }}</td>
+        <td class="px-3 py-1 text-right text-orange-600 whitespace-nowrap">{{ da_total.get(e.id, 0)|inr if da_total.get(e.id) else '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

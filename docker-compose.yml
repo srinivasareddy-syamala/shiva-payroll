@@ -1,0 +1,44 @@
+# Shiva Traders Payroll - PostgreSQL + app
+# Start:  docker compose up -d --build      Stop: docker compose down
+# Change the passwords below BEFORE the first start.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Shiva@db2026
+      POSTGRES_DB: shiva_payroll
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"          # for pgAdmin/DBeaver on this PC: localhost:5433
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shiva_payroll"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:Shiva%40db2026@db:5432/shiva_payroll
+      SECRET_KEY: change-this-to-a-long-random-string-9f3k2l
+      COMPANY_NAME: Shiva Traders
+      COMPANY_ADDRESS: ""
+      ADMIN_USER: admin              # first owner login (created once)
+      ADMIN_PASSWORD: admin123       # change after first login
+      TZ: IST-5:30            # India time (works without tzdata)
+      UPLOAD_FOLDER: /app/uploads    # diesel / repair bill photos
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "5000:5000"
+
+volumes:
+  pgdata:
+  uploads:

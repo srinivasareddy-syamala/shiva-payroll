@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-blue-950 mb-1">{{ 'Edit expense' if e.id else 'Add vehicle expense' }}</h1>
+{% if e.id and e.status == 'Rejected' %}
+<div class="mb-4 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-700">Rejected: {{ e.review_note }}. Correct it and save to send for approval again.</div>
+{% endif %}
+{% if not current_user.is_owner %}<p class="text-sm text-slate-500 mb-4">Your entry goes to the owner for approval.</p>{% else %}<div class="mb-4"></div>{% endif %}
+
+{% set inp = "w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" %}
+<form method="post" enctype="multipart/form-data" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-3xl">
+  <input type="hidden" name="next" value="{{ next or '' }}">
+  <!-- category tabs -->
+  <div class="grid grid-cols-4 gap-2 mb-5">
+    {% for cat, icon in categories.items() %}
+    <label class="cursor-pointer">
+      <input type="radio" name="category" value="{{ cat }}" class="peer sr-only" {{ 'checked' if e.category == cat }}>
+      <span class="flex flex-col sm:flex-row sm:justify-center items-center gap-0.5 sm:gap-1 text-center rounded-xl border-2 border-slate-200 py-2 text-xs sm:text-sm font-semibold peer-checked:border-blue-700 peer-checked:bg-blue-700 peer-checked:text-white"><span class="text-lg sm:text-base">{{ icon }}</span>{{ cat }}</span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div><label class="block text-sm font-medium mb-1">Vehicle *</label>
+      <select name="vehicle_id" required class="{{ inp }}"><option value="">Select vehicle…</option>
+        {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if e.vehicle_id == v.id }}>{{ v.number }}{% if v.driver %} — {{ v.driver.name }}{% endif %}</option>{% endfor %}</select></div>
+    <div><label class="block text-sm font-medium mb-1">Date *</label>
+      <input type="date" name="date" value="{{ e.date.isoformat() if e.date else '' }}" max="{{ e.date.today().isoformat() if e.date else '' }}" class="{{ inp }}"></div>
+    <div><label class="block text-sm font-medium mb-1">Amount ₹ *</label>
+      <input name="amount" value="{{ e.amount|days if e.amount else '' }}" inputmode="decimal" required class="{{ inp }} text-lg font-semibold" id="amount"></div>
+    <div><label class="block text-sm font-medium mb-1">Driver</label>
+      <select name="driver_id" class="{{ inp }}"><option value="">—</option>
+        {% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if e.driver_id == d.id }}>{{ d.name }}</option>{% endfor %}</select></div>
+
+    <!-- Diesel -->
+    <div class="cat-Diesel"><label class="block text-sm font-medium mb-1">Litres</label>
+      <input name="litres" value="{{ e.litres|days if e.litres else '' }}" inputmode="decimal" id="litres" class="{{ inp }}">
+      <p class="text-xs text-slate-500 mt-1" id="rate"></p></div>
+    <div class="cat-Diesel cat-Repair"><label class="block text-sm font-medium mb-1">Odometer (km)</label>
+      <input name="odometer" value="{{ e.odometer or '' }}" inputmode="numeric" class="{{ inp }}"></div>
+
+    <!-- Loading -->
+    <div class="cat-Loading"><label class="block text-sm font-medium mb-1">Birds loaded</label>
+      <input name="birds" value="{{ e.birds or '' }}" inputmode="numeric" id="birds" class="{{ inp }}">
+      <p class="text-xs text-slate-500 mt-1" id="perbird"></p></div>
+    <div class="cat-Loading"><label class="block text-sm font-medium mb-1">No. of labourers</label>
+      <input name="labourers" value="{{ e.labourers or '' }}" inputmode="numeric" class="{{ inp }}"></div>
+
+    <div><label class="block text-sm font-medium mb-1" id="vendorLabel">Bunk / garage / place</label>
+      <input name="vendor" value="{{ e.vendor or '' }}" class="{{ inp }}"></div>
+    <div><label class="block text-sm font-medium mb-1">Bill no.</label>
+      <input name="bill_no" value="{{ e.bill_no or '' }}" class="{{ inp }}"></div>
+    <div><label class="block text-sm font-medium mb-1">Paid by</label>
+      <select name="payment_mode" class="{{ inp }}">{% for m in ['Cash', 'UPI', 'Card', 'Credit', 'Bank'] %}<option {{ 'selected' if e.payment_mode == m }}>{{ m }}</option>{% endfor %}</select></div>
+    <div class="md:col-span-2"><label class="block text-sm font-medium mb-1">Description</label>
+      <input name="description" value="{{ e.description or '' }}" placeholder="e.g. Clutch plate replaced / Farm → Hyderabad market" class="{{ inp }}"></div>
+
+    <!-- Slip upload -->
+    <div class="md:col-span-2 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-4">
+      <label class="block text-sm font-semibold text-blue-900 mb-1">📷 Bill / slip photo <span id="slipReq" class="text-red-600">* required for diesel</span></label>
+      <input type="file" name="slip" accept="image/*,application/pdf" class="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-700 file:px-4 file:py-2 file:text-white">
+      {% if e.slip_file %}
+      <p class="text-xs text-slate-600 mt-2">Current: <a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700 underline">view slip</a> — choose a new file only to replace it.</p>
+      {% endif %}
+    </div>
+
+    {% if current_user.is_owner and not e.id %}
+    <label class="md:col-span-2 flex items-center gap-2 text-sm text-slate-600">
+      <input type="checkbox" name="needs_approval" class="w-4 h-4"> Keep as <b>pending</b> (approve later from Approvals)
+    </label>
+    {% endif %}
+  </div>
+
+  <div class="flex flex-wrap gap-3 mt-6">
+    <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-6 py-2.5 font-semibold">Save</button>
+    {% if not e.id %}<button name="again" value="1" class="border border-blue-700 text-blue-700 rounded-lg px-4 py-2.5 font-semibold">Save &amp; add another</button>{% endif %}
+    <a href="{{ next or url_for('vehicles.expenses') }}" class="px-4 py-2.5 text-slate-500">Cancel</a>
+  </div>
+</form>
+
+<script>
+const labels = {Diesel: 'Petrol bunk', Repair: 'Garage / mechanic', Loading: 'Farm / place of loading', Other: 'Paid to / place'};
+function showCat() {
+  const cat = document.querySelector('input[name=category]:checked').value;
+  document.querySelectorAll('[class*="cat-"]').forEach(el => {
+    el.style.display = el.className.includes('cat-' + cat) ? '' : 'none';
+  });
+  document.getElementById('vendorLabel').textContent = labels[cat];
+  document.getElementById('slipReq').style.display = cat === 'Diesel' ? '' : 'none';
+  calc();
+}
+function calc() {
+  const a = parseFloat(document.getElementById('amount').value) || 0;
+  const l = parseFloat(document.getElementById('litres').value) || 0;
+  const b = parseFloat(document.getElementById('birds').value) || 0;
+  document.getElementById('rate').textContent = a && l ? '≈ ₹' + (a / l).toFixed(2) + ' per litre' : '';
+  document.getElementById('perbird').textContent = a && b ? '≈ ₹' + (a / b).toFixed(2) + ' per bird' : '';
+}
+document.querySelectorAll('input[name=category]').forEach(r => r.addEventListener('change', showCat));
+['amount', 'litres', 'birds'].forEach(id => document.getElementById(id).addEventListener('input', calc));
+showCat();
+</script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <h1 class="text-2xl font-bold">Salary register — {{ month_label }}</h1>
+  <div class="flex items-center gap-2">
+    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border rounded-lg px-3 py-2"></form>
+    <a href="{{ url_for('salary.register_excel', month=month_value) }}" class="bg-green-600 text-white rounded-lg px-3 py-2 text-sm">⬇ Excel</a>
+    <button onclick="window.print()" class="border bg-white rounded-lg px-3 py-2 text-sm">Print</button>
+  </div>
+</div>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-blue-900 text-blue-50">
+      <tr class="text-right">
+        <th class="px-3 py-2 text-left">Name</th><th class="px-3 py-2">Days</th><th class="px-3 py-2">Earned</th>
+        <th class="px-3 py-2">OT</th><th class="px-3 py-2">DA</th><th class="px-3 py-2">Bonus</th><th class="px-3 py-2">Advance</th>
+        <th class="px-3 py-2">Other</th><th class="px-3 py-2">Net paid</th><th class="px-3 py-2 text-left">Mode</th><th></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for p in payments %}
+      <tr class="text-right">
+        <td class="px-3 py-2 text-left font-medium">{{ p.employee.name }} <span class="text-xs text-slate-400">{{ p.employee.emp_type }}</span></td>
+        <td class="px-3 py-2">{{ p.paid_days|days }}</td>
+        <td class="px-3 py-2">{{ p.earned|inr }}</td>
+        <td class="px-3 py-2">{{ p.ot_amount|inr }}</td>
+        <td class="px-3 py-2 text-orange-700">{{ p.da_amount|inr }}</td>
+        <td class="px-3 py-2">{{ p.bonus|inr }}</td>
+        <td class="px-3 py-2 text-red-600">{{ p.advance_deducted|inr }}</td>
+        <td class="px-3 py-2">{{ p.other_deductions|inr }}</td>
+        <td class="px-3 py-2 font-bold">{{ p.net_paid|inr }}</td>
+        <td class="px-3 py-2 text-left">{{ p.payment_mode }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">
+          <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="text-blue-700 text-xs">Slip</a>
+          <a href="{{ url_for('salary.share', payment_id=p.id) }}" class="text-emerald-600 text-xs font-semibold ml-2">WhatsApp</a>
+          <form method="post" action="{{ url_for('salary.delete', payment_id=p.id) }}" class="inline" onsubmit="return confirm('Remove this salary entry?')">
+            <button class="text-red-500 text-xs ml-2">Remove</button></form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">No salary saved for this month.</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if payments %}
+    <tfoot class="bg-slate-50 font-bold text-right">
+      <tr><td class="px-3 py-2 text-left">Total</td><td></td>
+        <td class="px-3 py-2">{{ totals.earned|inr }}</td><td class="px-3 py-2">{{ totals.ot_amount|inr }}</td><td class="px-3 py-2">{{ totals.da_amount|inr }}</td>
+        <td class="px-3 py-2">{{ totals.bonus|inr }}</td><td class="px-3 py-2">{{ totals.advance_deducted|inr }}</td>
+        <td class="px-3 py-2">{{ totals.other_deductions|inr }}</td><td class="px-3 py-2">{{ totals.net_paid|inr }}</td><td colspan="2"></td></tr>
+    </tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endblock %}

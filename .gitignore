@@ -1,0 +1,10 @@
+# secrets & local data - never upload
+.env
+uploads/
+backups/
+venv/
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+*.tgz

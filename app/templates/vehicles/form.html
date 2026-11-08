@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold text-blue-950 mb-6">{{ 'Edit ' ~ v.number if v.id else 'Add vehicle' }}</h1>
+{% set inp = "w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" %}
+<form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 grid md:grid-cols-2 gap-4 max-w-3xl">
+  <div><label class="block text-sm font-medium mb-1">Vehicle number *</label>
+    <input name="number" value="{{ v.number or '' }}" required placeholder="AP16TX1234" class="{{ inp }} uppercase"></div>
+  <div><label class="block text-sm font-medium mb-1">Type</label>
+    <select name="vehicle_type" class="{{ inp }}">{% for t in types %}<option {{ 'selected' if v.vehicle_type == t }}>{{ t }}</option>{% endfor %}</select></div>
+  <div><label class="block text-sm font-medium mb-1">Make / model</label>
+    <input name="model" value="{{ v.model or '' }}" placeholder="Tata 407" class="{{ inp }}"></div>
+  <div><label class="block text-sm font-medium mb-1">Capacity</label>
+    <input name="capacity" value="{{ v.capacity or '' }}" placeholder="e.g. 1500 birds / 4 ton" class="{{ inp }}"></div>
+  <div><label class="block text-sm font-medium mb-1">Regular driver</label>
+    <select name="driver_id" class="{{ inp }}"><option value="">— none —</option>
+      {% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if v.driver_id == d.id }}>{{ d.name }} ({{ d.emp_type }})</option>{% endfor %}</select></div>
+  <div class="flex items-center gap-2 mt-6">
+    <input type="checkbox" name="active" id="active" {{ 'checked' if v.active }} class="w-4 h-4">
+    <label for="active" class="text-sm">Active</label></div>
+  <div class="md:col-span-2"><label class="block text-sm font-medium mb-1">Notes (insurance / FC due dates etc.)</label>
+    <textarea name="notes" rows="2" class="{{ inp }}">{{ v.notes or '' }}</textarea></div>
+  <div class="md:col-span-2 flex gap-3">
+    <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-5 py-2 font-semibold">Save</button>
+    <a href="{{ url_for('vehicles.index') }}" class="px-5 py-2 text-slate-500">Cancel</a>
+  </div>
+</form>
+{% if v.id %}
+<form method="post" action="{{ url_for('vehicles.delete', vid=v.id) }}" onsubmit="return confirm('Delete vehicle {{ v.number }}?')" class="mt-4">
+  <button class="text-sm text-red-600 border border-red-300 rounded-lg px-4 py-2 hover:bg-red-50">Delete vehicle</button>
+</form>
+{% endif %}
+{% endblock %}

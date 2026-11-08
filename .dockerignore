@@ -1,0 +1,9 @@
+venv/
+.venv/
+.env
+backups/
+__pycache__/
+*.pyc
+*.bat
+node_modules/
+uploads/

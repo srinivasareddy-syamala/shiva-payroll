@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-wrap items-start justify-between gap-3 mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-blue-950">{{ emp.name }}</h1>
+    <p class="text-slate-500 text-sm">{{ emp.emp_type }} · {{ emp.rate|inr }} / {{ 'month' if emp.pay_type == 'Monthly' else 'day' }}
+      {% if emp.phone %} · <a href="tel:{{ emp.phone }}" class="text-blue-700">{{ emp.phone }}</a>{% endif %}
+      {% if emp.whatsapp_number %} · <span class="text-emerald-600">WhatsApp +{{ emp.whatsapp_number }}</span>{% endif %}
+      {% if emp.vehicle_no %} · {{ emp.vehicle_no }}{% endif %}
+      {% if not emp.active %} · <span class="text-red-600">Inactive</span>{% endif %}</p>
+  </div>
+  <div class="flex gap-2">
+    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></form>
+    <a href="{{ url_for('employees.edit', emp_id=emp.id) }}" class="border border-slate-300 bg-white rounded-lg px-4 py-2 text-sm">Edit employee</a>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+  {% macro tile(label, value, color) -%}
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-{{ color }}-500 p-3">
+    <div class="text-[11px] uppercase text-slate-500">{{ label }}</div>
+    <div class="text-xl font-bold">{{ value }}</div>
+  </div>
+  {%- endmacro %}
+  {{ tile('Paid days · ' ~ month_label, summary.paid_days|days ~ ' / ' ~ summary.days_in_month, 'blue') }}
+  {{ tile('P / H / A / L', summary.counts.P ~ ' / ' ~ summary.counts.H ~ ' / ' ~ summary.counts.A ~ ' / ' ~ summary.counts.L, 'sky') }}
+  {{ tile('OT hours', summary.ot_hours|days, 'indigo') }}
+  {{ tile('DA this month', summary.da_amount|inr, 'orange') }}
+  {{ tile('Advance outstanding', outstanding|inr, 'red') }}
+</div>
+
+{% if month_payment %}
+<div class="mb-4 rounded-xl px-4 py-3 text-sm bg-blue-50 border border-blue-200 text-blue-900">
+  Salary for {{ month_label }} is saved ({{ month_payment.net_paid|inr }}). If you change days below, open
+  <a class="underline font-semibold" href="{{ url_for('salary.run', month=month_value) }}">Salary</a> and press Save again so the slip updates.
+</div>
+{% endif %}
+
+<!-- Day ledger -->
+<h2 class="font-semibold text-blue-950 mb-2">Day ledger — {{ month_label }}</h2>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y mb-8">
+  <div class="hidden md:flex px-4 py-2 text-xs text-slate-500 bg-slate-50 rounded-t-2xl gap-3">
+    <span class="w-28">Date</span><span class="w-40">Status</span><span class="w-20">OT hrs</span><span class="w-24">DA ₹</span><span class="flex-1">Remarks</span><span class="w-36"></span>
+  </div>
+  {% for d, rec in day_rows|reverse %}
+  <form method="post" action="{{ url_for('employees.day_update', emp_id=emp.id, day=d.isoformat()) }}" id="d{{ d.isoformat() }}"
+        class="flex flex-wrap md:flex-nowrap items-center gap-3 px-4 py-2 {{ 'bg-orange-50/60' if rec and rec.da_amount > 0 else '' }} {{ 'bg-slate-50' if d.weekday() == 6 and not rec else '' }}">
+    <span class="w-28 text-sm"><b>{{ d.strftime('%d %b') }}</b> <span class="text-slate-400 text-xs">{{ d.strftime('%a') }}</span></span>
+    <span class="w-40 flex gap-1">
+      {% for code in statuses %}
+      <label class="cursor-pointer">
+        <input type="radio" name="status" value="{{ code }}" class="att att-{{ code }} sr-only" {{ 'checked' if rec and rec.status == code }}>
+        <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg border-2 border-slate-200 text-sm font-bold select-none">{{ code }}</span>
+      </label>
+      {% endfor %}
+    </span>
+    <input name="ot" value="{{ rec.ot_hours|days if rec and rec.ot_hours else '' }}" placeholder="OT" inputmode="decimal" class="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+    <input name="da" value="{{ rec.da_amount|days if rec and rec.da_amount else '' }}" placeholder="DA" inputmode="decimal" class="w-24 border border-orange-300 rounded-lg px-2 py-1.5 text-sm">
+    <input name="remarks" value="{{ rec.remarks if rec and rec.remarks else '' }}" placeholder="{{ 'Remarks' if rec else 'Not marked' }}" class="flex-1 min-w-[120px] border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+    <span class="w-36 flex gap-2 justify-end">
+      <button name="action" value="save" class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-3 py-1.5 text-xs font-semibold">Save</button>
+      {% if rec %}
+      <button name="action" value="delete" onclick="return confirm('Delete the entry for {{ d.strftime('%d %b') }}?')" class="border border-red-300 text-red-600 hover:bg-red-50 rounded-lg px-3 py-1.5 text-xs">Delete</button>
+      {% endif %}
+    </span>
+  </form>
+  {% else %}
+  <div class="px-4 py-6 text-slate-400 text-sm">No days to show for this month.</div>
+  {% endfor %}
+</div>
+
+<div class="grid md:grid-cols-2 gap-6">
+  <div>
+    <h2 class="font-semibold text-blue-950 mb-2">Advances</h2>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+      {% for a in advances %}
+      <div class="flex justify-between items-center px-4 py-2 gap-2">
+        <span>{{ a.date.strftime('%d %b %Y') }} <span class="text-slate-400">{{ a.mode }}{% if a.reason %} · {{ a.reason }}{% endif %}</span></span>
+        <span class="flex items-center gap-3 whitespace-nowrap"><b>{{ a.amount|inr }}</b>
+          <a href="{{ url_for('advances.edit', adv_id=a.id, next=request.full_path) }}" class="text-blue-700 text-xs">Edit</a>
+          <form method="post" action="{{ url_for('advances.delete', adv_id=a.id) }}" onsubmit="return confirm('Delete this advance of {{ a.amount|inr }}?')">
+            <button class="text-red-500 text-xs">Delete</button></form></span>
+      </div>
+      {% else %}<div class="px-4 py-4 text-slate-400">No advances.</div>{% endfor %}
+    </div>
+  </div>
+  <div>
+    <h2 class="font-semibold text-blue-950 mb-2">Salary payments</h2>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+      {% for p in payments %}
+      <div class="flex justify-between items-center px-4 py-2 gap-2">
+        <span>{{ '%04d-%02d'|format(p.year, p.month) }}
+          <span class="text-slate-400">{{ p.paid_days|days }} days{% if p.da_amount %} · DA {{ p.da_amount|inr }}{% endif %} · adv −{{ p.advance_deducted|inr }}</span></span>
+        <span class="flex items-center gap-3 whitespace-nowrap"><b>{{ p.net_paid|inr }}</b>
+          <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="text-blue-700 text-xs">Slip</a>
+          <a href="{{ url_for('salary.share', payment_id=p.id) }}" class="text-emerald-600 text-xs font-semibold">WhatsApp</a>
+          <form method="post" action="{{ url_for('salary.delete', payment_id=p.id) }}" onsubmit="return confirm('Remove this salary entry? Advance recovery will be reversed.')">
+            <button class="text-red-500 text-xs">Delete</button></form></span>
+      </div>
+      {% else %}<div class="px-4 py-4 text-slate-400">No salary paid yet.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

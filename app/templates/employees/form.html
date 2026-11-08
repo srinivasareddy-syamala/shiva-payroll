@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">{{ 'Edit ' ~ emp.name if emp.id else 'Add employee' }}</h1>
+{% set inp = "w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" %}
+<form method="post" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 grid md:grid-cols-2 gap-4 max-w-3xl">
+  <div class="md:col-span-2">
+    <label class="block text-sm font-medium mb-1">Name *</label>
+    <input name="name" value="{{ emp.name or '' }}" required class="{{ inp }}">
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">Phone</label>
+    <input name="phone" value="{{ emp.phone or '' }}" inputmode="tel" class="{{ inp }}">
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">WhatsApp number <span class="text-slate-400 font-normal">(if different from phone)</span></label>
+    <input name="whatsapp" value="{{ emp.whatsapp or '' }}" inputmode="tel" placeholder="10-digit mobile" class="{{ inp }}">
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">Type</label>
+    <select name="emp_type" class="{{ inp }}">
+      {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp.emp_type == t }}>{{ t }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">Pay type</label>
+    <select name="pay_type" class="{{ inp }}">
+      <option value="Monthly" {{ 'selected' if emp.pay_type != 'Daily' }}>Monthly salary</option>
+      <option value="Daily" {{ 'selected' if emp.pay_type == 'Daily' }}>Daily wage</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">Rate (₹ per month / per day) *</label>
+    <input name="rate" value="{{ emp.rate or '' }}" inputmode="decimal" required class="{{ inp }}">
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">Overtime rate (₹ per hour)</label>
+    <input name="ot_rate" value="{{ emp.ot_rate or 0 }}" inputmode="decimal" class="{{ inp }}">
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">Vehicle no. (drivers)</label>
+    <input name="vehicle_no" value="{{ emp.vehicle_no or '' }}" class="{{ inp }}">
+  </div>
+  <div>
+    <label class="block text-sm font-medium mb-1">Joining date</label>
+    <input type="date" name="joining_date" value="{{ emp.joining_date.isoformat() if emp.joining_date else '' }}" class="{{ inp }}">
+  </div>
+  <div class="flex items-center gap-2 mt-6">
+    <input type="checkbox" name="active" id="active" {{ 'checked' if emp.active }} class="w-4 h-4">
+    <label for="active" class="text-sm">Active (shown in attendance &amp; salary)</label>
+  </div>
+  <div class="md:col-span-2">
+    <label class="block text-sm font-medium mb-1">Notes</label>
+    <textarea name="notes" rows="2" class="{{ inp }}">{{ emp.notes or '' }}</textarea>
+  </div>
+  <div class="md:col-span-2 flex gap-3">
+    <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-5 py-2 font-semibold">Save</button>
+    <a href="{{ url_for('employees.index') }}" class="px-5 py-2 text-slate-500">Cancel</a>
+  </div>
+</form>
+{% endblock %}

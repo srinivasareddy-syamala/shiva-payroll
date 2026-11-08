@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Advances</h1>
+{% set inp = "w-full border rounded-lg px-3 py-2" %}
+<div class="grid md:grid-cols-3 gap-6">
+  <form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-3 h-fit">
+    <h2 class="font-semibold">Give advance</h2>
+    <select name="employee_id" required class="{{ inp }}">
+      <option value="">Select employee…</option>
+      {% for e in employees %}<option value="{{ e.id }}">{{ e.name }} ({{ e.emp_type }})</option>{% endfor %}
+    </select>
+    <input name="amount" placeholder="Amount ₹" inputmode="decimal" required class="{{ inp }}">
+    <input type="date" name="date" value="{{ today.isoformat() }}" class="{{ inp }}">
+    <select name="mode" class="{{ inp }}">
+      {% for m in ['Cash', 'UPI', 'Bank'] %}<option>{{ m }}</option>{% endfor %}
+    </select>
+    <input name="reason" placeholder="Reason (optional)" class="{{ inp }}">
+    <button class="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-2 font-semibold">Save advance</button>
+  </form>
+
+  <div class="md:col-span-2 space-y-6">
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="font-semibold">Given in {{ month_label }} — {{ total|inr }}</h2>
+        <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border rounded px-2 py-1 text-sm"></form>
+      </div>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+        {% for a in advances %}
+        <div class="flex items-center justify-between px-4 py-2">
+          <span><a href="{{ url_for('employees.ledger', emp_id=a.employee_id) }}" class="font-medium text-blue-700">{{ a.employee.name }}</a>
+            <span class="text-slate-400">{{ a.date.strftime('%d %b') }} · {{ a.mode }}{% if a.reason %} · {{ a.reason }}{% endif %}</span></span>
+          <span class="flex items-center gap-3"><b>{{ a.amount|inr }}</b>
+            <form method="post" action="{{ url_for('advances.delete', adv_id=a.id) }}" onsubmit="return confirm('Delete this advance?')">
+              <button class="text-red-500 text-xs">Delete</button></form></span>
+        </div>
+        {% else %}<div class="px-4 py-4 text-slate-400">No advances this month.</div>{% endfor %}
+      </div>
+    </div>
+    <div>
+      <h2 class="font-semibold mb-2">Outstanding balances (all time)</h2>
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+        {% for e, o in outstanding %}
+        <div class="flex justify-between px-4 py-2">
+          <a href="{{ url_for('employees.ledger', emp_id=e.id) }}" class="text-blue-700">{{ e.name }}</a>
+          <b class="{{ 'text-red-600' if o > 0 else 'text-green-600' }}">{{ o|inr }}</b>
+        </div>
+        {% else %}<div class="px-4 py-4 text-slate-400">Nobody owes anything.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

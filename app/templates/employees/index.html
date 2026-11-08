@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <h1 class="text-2xl font-bold">Employees</h1>
+  <a href="{{ url_for('employees.new') }}" class="bg-blue-700 text-white rounded-lg px-4 py-2 text-sm">+ Add employee</a>
+</div>
+<form class="flex flex-wrap gap-2 mb-4">
+  <input name="q" value="{{ search }}" placeholder="Search name…" class="border rounded-lg px-3 py-2 text-sm flex-1 min-w-[160px]">
+  <select name="show" class="border rounded-lg px-3 py-2 text-sm" onchange="this.form.submit()">
+    {% for v, l in [('active','Active'),('inactive','Inactive'),('all','All')] %}
+      <option value="{{ v }}" {{ 'selected' if show == v }}>{{ l }}</option>
+    {% endfor %}
+  </select>
+  <button class="border rounded-lg px-3 py-2 text-sm bg-white">Search</button>
+</form>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-blue-900 text-left text-blue-50">
+      <tr><th class="px-4 py-3">Name</th><th class="px-4 py-3">Type</th><th class="px-4 py-3">Pay</th>
+          <th class="px-4 py-3">Phone</th><th class="px-4 py-3"></th></tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for e in employees %}
+      <tr class="{{ 'opacity-50' if not e.active }}">
+        <td class="px-4 py-3 font-medium"><a class="text-blue-700" href="{{ url_for('employees.ledger', emp_id=e.id) }}">{{ e.name }}</a>
+          {% if e.vehicle_no %}<span class="text-xs text-slate-400 ml-1">{{ e.vehicle_no }}</span>{% endif %}</td>
+        <td class="px-4 py-3"><span class="text-xs px-2 py-1 rounded-full {{ 'bg-blue-100 text-blue-800' if e.emp_type == 'Driver' else 'bg-amber-100 text-amber-800' }}">{{ e.emp_type }}</span></td>
+        <td class="px-4 py-3">{{ e.rate|inr }} <span class="text-slate-400">/ {{ 'month' if e.pay_type == 'Monthly' else 'day' }}</span></td>
+        <td class="px-4 py-3">{% if e.phone %}<a href="tel:{{ e.phone }}" class="text-blue-700">{{ e.phone }}</a>{% endif %}</td>
+        <td class="px-4 py-3 text-right"><a href="{{ url_for('employees.edit', emp_id=e.id) }}" class="text-slate-500 hover:text-blue-700">Edit</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">No employees yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

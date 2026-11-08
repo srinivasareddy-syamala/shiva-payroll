@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "vehicles/_status.html" import badge %}
+{% block content %}
+<h1 class="text-2xl font-bold text-blue-950 mb-1">Approvals</h1>
+<p class="text-sm text-slate-500 mb-5">Check each bill slip, then approve or reject. Only approved expenses count in vehicle totals and reports.</p>
+
+{% if items %}
+<form method="post" id="bulk" class="flex flex-wrap items-center gap-2 mb-4">
+  <input type="hidden" name="action" value="approve">
+  <button type="button" onclick="document.querySelectorAll('.pick').forEach(c=>c.checked=true)" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">Select all</button>
+  <button class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">✓ Approve selected</button>
+</form>
+{% endif %}
+
+<div class="grid md:grid-cols-2 gap-4">
+  {% for e in items %}
+  <div class="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
+    <div class="flex">
+      <a href="{{ url_for('vehicles.slip', eid=e.id) if e.slip_file else '#' }}" target="_blank"
+         class="w-32 shrink-0 bg-slate-100 flex items-center justify-center border-r border-slate-200">
+        {% if e.slip_file and not e.slip_file.endswith('.pdf') %}
+          <img src="{{ url_for('vehicles.slip', eid=e.id) }}" alt="slip" class="w-32 h-full max-h-48 object-cover">
+        {% elif e.slip_file %}<span class="text-3xl">📄</span><span class="sr-only">PDF</span>
+        {% else %}<span class="text-xs text-slate-400 p-2 text-center">No slip</span>{% endif %}
+      </a>
+      <div class="p-4 flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" name="ids" value="{{ e.id }}" form="bulk" class="pick w-4 h-4">
+              <span class="font-bold text-blue-950">{{ e.vehicle.number }}</span></label>
+            <div class="text-sm">{{ e.category }} · {{ e.date.strftime('%d %b %Y') }}</div>
+          </div>
+          <div class="text-xl font-bold">{{ e.amount|inr }}</div>
+        </div>
+        <div class="text-xs text-slate-500 mt-1 space-y-0.5">
+          {% if e.litres %}<div>{{ e.litres|days }} L · ₹{{ e.rate_per_litre }}/L{% if e.odometer %} · {{ e.odometer }} km{% endif %}</div>{% endif %}
+          {% if e.birds %}<div>{{ e.birds }} birds{% if e.labourers %} · {{ e.labourers }} workers{% endif %}</div>{% endif %}
+          {% if e.vendor or e.bill_no %}<div>{{ e.vendor or '' }}{% if e.bill_no %} · Bill {{ e.bill_no }}{% endif %}</div>{% endif %}
+          {% if e.description %}<div>{{ e.description }}</div>{% endif %}
+          <div>{{ e.payment_mode }}{% if e.driver %} · Driver {{ e.driver.name }}{% endif %} · by {{ e.submitter.username if e.submitter else '?' }}</div>
+        </div>
+        <form method="post" class="mt-3 flex flex-wrap gap-2">
+          <input type="hidden" name="id" value="{{ e.id }}">
+          <input name="note" placeholder="Note / reason (needed to reject)" class="flex-1 min-w-[140px] border border-slate-300 rounded-lg px-2 py-1.5 text-xs">
+          <button name="action" value="approve" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-1.5 text-xs font-semibold">✓ Approve</button>
+          <button name="action" value="reject" class="border border-red-300 text-red-600 hover:bg-red-50 rounded-lg px-3 py-1.5 text-xs font-semibold">✕ Reject</button>
+          <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.path) }}" class="text-blue-700 text-xs self-center">Edit</a>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-400">🎉 Nothing waiting for approval.</div>
+  {% endfor %}
+</div>
+
+{% if recent %}
+<h2 class="font-semibold text-blue-950 mt-8 mb-2">Recently reviewed</h2>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+  {% for e in recent %}
+  <div class="flex flex-wrap justify-between gap-2 px-4 py-2">
+    <span>{{ e.date.strftime('%d %b') }} · <b>{{ e.vehicle.number }}</b> · {{ e.category }}{% if e.review_note %} <span class="text-slate-400">— {{ e.review_note }}</span>{% endif %}</span>
+    <span class="flex items-center gap-3">{{ badge(e.status) }} <b>{{ e.amount|inr }}</b>
+      <span class="text-xs text-slate-400">{{ e.reviewer.username if e.reviewer else '' }}</span></span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
