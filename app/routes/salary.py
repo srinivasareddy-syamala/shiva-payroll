@@ -76,9 +76,23 @@ def run():
         rows = [r for r in rows if r[1]["stale"]]
     counts = {"total": len(rows), "paid": sum(1 for r in rows if r[1]["existing"]),
               "changed": sum(1 for r in rows if r[1]["stale"])}
+    unpaid = [c for _, c in rows if not c["existing"]]
+    summary = {
+        "paid_days": sum((c["paid_days"] for _, c in rows), Decimal(0)),
+        "gross": sum((c["gross"] for _, c in rows), Decimal(0)),
+        "da": sum((c["da_amount"] for _, c in rows), Decimal(0)),
+        # paid employees: balance left after this month's recovery; unpaid: full amount due
+        "outstanding": sum(((c["existing"].advance_balance_after if c["existing"] else c["advance_outstanding"])
+                            for _, c in rows), Decimal(0)),
+        "unpaid_count": len(unpaid),
+        "unpaid_gross": sum((c["gross"] for c in unpaid), Decimal(0)),
+        "unpaid_recovery": sum((c["suggested_advance"] for c in unpaid), Decimal(0)),
+        "already_paid": sum((c["existing"].net_paid for _, c in rows if c["existing"]), Decimal(0)),
+    }
+    summary["net_to_pay"] = summary["unpaid_gross"] - summary["unpaid_recovery"]
     return render_template("salary/run.html", rows=rows, month_value=f"{year:04d}-{month:02d}",
                            month_label=start.strftime("%B %Y"), today=today(),
-                           emp_type=emp_type, q=q, status=status, counts=counts)
+                           emp_type=emp_type, q=q, status=status, counts=counts, summary=summary)
 
 
 TOTAL_KEYS = ("earned", "ot_amount", "da_amount", "bonus", "advance_deducted", "other_deductions", "net_paid")

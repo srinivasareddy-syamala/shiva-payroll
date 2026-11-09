@@ -16,8 +16,35 @@
     <a href="{{ url_for('salary.report') }}" class="bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm">📊 Salary &amp; advances report</a>
   </div>
 </div>
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
+  <div class="col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-2xl p-4 shadow">
+    <div class="text-[11px] uppercase tracking-wide text-blue-200">Net amount to pay</div>
+    <div class="text-2xl font-bold">{{ summary.net_to_pay|inr }}</div>
+    <div class="text-xs text-blue-200">{{ summary.unpaid_count }} not paid yet · after advance recovery</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-red-500 p-4">
+    <div class="text-[11px] uppercase text-slate-500">Outstanding advance</div>
+    <div class="text-2xl font-bold text-red-600">{{ summary.outstanding|inr }}</div>
+    <div class="text-xs text-slate-400">to recover · {{ summary.unpaid_recovery|inr }} suggested now</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-4">
+    <div class="text-[11px] uppercase text-slate-500">Gross earned</div>
+    <div class="text-2xl font-bold">{{ summary.gross|inr }}</div>
+    <div class="text-xs text-slate-400">incl. OT &amp; DA {{ summary.da|inr }}</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-sky-500 p-4">
+    <div class="text-[11px] uppercase text-slate-500">Working days</div>
+    <div class="text-2xl font-bold">{{ summary.paid_days|days }}</div>
+    <div class="text-xs text-slate-400">paid days, all shown</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-indigo-500 p-4">
+    <div class="text-[11px] uppercase text-slate-500">Already paid</div>
+    <div class="text-2xl font-bold">{{ summary.already_paid|inr }}</div>
+    <div class="text-xs text-slate-400">{{ counts.paid }} employee{{ 's' if counts.paid != 1 }}</div>
+  </div>
+</div>
 <p class="text-sm mb-2"><b>{{ counts.total }}</b> employees · <span class="text-emerald-700">{{ counts.paid }} paid</span> · <span class="text-slate-600">{{ counts.total - counts.paid }} not paid</span>{% if counts.changed %} · <span class="text-amber-700">{{ counts.changed }} attendance changed</span>{% endif %}</p>
-<p class="text-sm text-slate-500 mb-4">Nothing is ticked by default: tick the employees you want to pay (or use the box in the header to tick all shown). Earned, OT and DA are calculated from attendance. Advance deduction is pre-filled with the outstanding balance (capped at gross) — change it if you want to recover in instalments. Tick the employees to pay and press Save.</p>
+<p class="text-sm text-slate-500 mb-4">Tick the employees to pay (header box ticks all shown), then Save. Advance deduction is pre-filled — change it to recover in instalments.</p>
 
 {% set num = "w-20 border rounded px-2 py-1 text-right" %}
 <form method="post">
