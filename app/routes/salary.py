@@ -115,6 +115,9 @@ def run():
         "da": sum((c["da_amount"] for _, c in rows), Decimal(0)),
         "outstanding": sum(((c["existing"].advance_balance_after if c["existing"] else c["advance_outstanding"])
                             for _, c in rows), Decimal(0)),
+        "advance_taken": sum((c["advance_taken"] for _, c in rows), Decimal(0)),
+        "advance_taken_count": sum(c["advance_taken_count"] for _, c in rows),
+        "advance_takers": sum(1 for _, c in rows if c["advance_taken_count"]),
         "unpaid_count": len(unpaid),
         "unpaid_gross": sum((c["gross"] for c in unpaid), Decimal(0)),
         "unpaid_recovery": sum((c["suggested_advance"] for c in unpaid), Decimal(0)),

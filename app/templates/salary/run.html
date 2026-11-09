@@ -17,16 +17,22 @@
 {% endset %}
 {{ range_filter(rng, extra) }}
 <p class="text-xs text-slate-500 -mt-2 mb-3">Pick <b>This week</b> / <b>Last week</b> for weekly pay, a month for monthly pay, or <b>Custom</b> dates. Monthly-salary employees are paid per day (monthly rate ÷ days in that month).</p>
-<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
+<div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-3">
   <div class="col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-2xl p-4 shadow">
     <div class="text-[11px] uppercase tracking-wide text-blue-200">Net amount to pay</div>
     <div class="text-2xl font-bold">{{ summary.net_to_pay|inr }}</div>
     <div class="text-xs text-blue-200">{{ summary.unpaid_count }} not paid yet · after advance recovery</div>
   </div>
+  <a href="{{ url_for('advances.index', range='custom', **{'from': rng.start.isoformat(), 'to': rng.end.isoformat()}) }}"
+     class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-orange-500 p-4 hover:bg-orange-50">
+    <div class="text-[11px] uppercase text-slate-500">Advance taken · these dates</div>
+    <div class="text-2xl font-bold text-orange-600">{{ summary.advance_taken|inr }}</div>
+    <div class="text-xs text-slate-400">{{ summary.advance_taken_count }} entr{{ 'y' if summary.advance_taken_count == 1 else 'ies' }} · {{ summary.advance_takers }} employee{{ 's' if summary.advance_takers != 1 }}</div>
+  </a>
   <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-red-500 p-4">
-    <div class="text-[11px] uppercase text-slate-500">Outstanding advance</div>
+    <div class="text-[11px] uppercase text-slate-500">Total advance balance</div>
     <div class="text-2xl font-bold text-red-600">{{ summary.outstanding|inr }}</div>
-    <div class="text-xs text-slate-400">to recover · {{ summary.unpaid_recovery|inr }} suggested now</div>
+    <div class="text-xs text-slate-400">all unrecovered advances up to {{ rng.end.strftime('%d %b') }} · {{ summary.unpaid_recovery|inr }} to recover now</div>
   </div>
   <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-4">
     <div class="text-[11px] uppercase text-slate-500">Gross earned</div>
@@ -62,7 +68,7 @@
           <th class="px-3 py-2 text-right">OT</th>
           <th class="px-3 py-2 text-right text-orange-700">DA</th>
           <th class="px-3 py-2 text-right">Bonus</th>
-          <th class="px-3 py-2 text-right">Adv. due</th>
+          <th class="px-3 py-2 text-right">Adv. balance</th>
           <th class="px-3 py-2 text-right">Adv. deduct</th>
           <th class="px-3 py-2 text-right">Other ded.</th>
           <th class="px-3 py-2 text-right">Net</th>
@@ -86,7 +92,8 @@
           <td class="px-3 py-2 text-right">{{ c.ot_amount|inr }}<div class="text-xs text-slate-400">{{ c.ot_hours|days }}h</div></td>
           <td class="px-3 py-2 text-right text-orange-700">{{ c.da_amount|inr }}{% if c.da_days %}<div class="text-xs text-slate-400">{{ c.da_days }} day{{ 's' if c.da_days != 1 }}</div>{% endif %}</td>
           <td class="px-3 py-2 text-right"><input name="bonus_{{ e.id }}" value="{{ p.bonus if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="bonus"></td>
-          <td class="px-3 py-2 text-right text-red-600">{{ c.advance_outstanding|inr }}</td>
+          <td class="px-3 py-2 text-right text-red-600">{{ c.advance_outstanding|inr }}
+            {% if c.advance_taken %}<div class="text-[11px] text-orange-600">taken {{ c.advance_taken|inr }} in these dates</div>{% endif %}</td>
           <td class="px-3 py-2 text-right"><input name="adv_{{ e.id }}" value="{{ p.advance_deducted if p else c.suggested_advance }}" inputmode="decimal" class="{{ num }} calc" data-k="adv"></td>
           <td class="px-3 py-2 text-right"><input name="other_{{ e.id }}" value="{{ p.other_deductions if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="other"></td>
           <td class="px-3 py-2 text-right font-bold net"></td>

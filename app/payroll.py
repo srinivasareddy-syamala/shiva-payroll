@@ -132,6 +132,10 @@ def calculate_period(employee, start, end):
                                          SalaryPayment.period_start <= end, SalaryPayment.period_end >= start,
                                          SalaryPayment.id != (existing.id if existing else 0)).first()
     outstanding = employee.advance_due_for_period(start, end, exclude_payment_id=existing.id if existing else None)
+    from .models import Advance
+    adv_rows = Advance.query.filter(Advance.employee_id == employee.id, Advance.date.between(start, end)).all()
+    s["advance_taken"] = money(sum((a.amount for a in adv_rows), Decimal(0)))
+    s["advance_taken_count"] = len(adv_rows)
     gross = earned + ot_amount + s["da_amount"]
     suggested_adv = money(max(Decimal("0"), min(outstanding, gross)))
     stale = bool(existing) and (
