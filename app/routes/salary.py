@@ -11,7 +11,7 @@ from .. import db
 from ..models import Employee, SalaryPayment, Setting
 from ..payroll import calculate, da_entries
 from ..pdf import salary_slip_pdf
-from ..utils import days, inr, money, month_bounds, owner_required, parse_month, to_dec
+from ..utils import days, inr, money, month_bounds, owner_required, parse_month, to_dec, today
 
 bp = Blueprint("salary", __name__, url_prefix="/salary")
 
@@ -52,7 +52,7 @@ def run():
             p.other_deductions = other
             p.net_paid = net
             p.payment_mode = request.form.get(f"mode_{emp.id}", "Cash")
-            p.paid_on = datetime.strptime(paid_on, "%Y-%m-%d").date() if paid_on else date.today()
+            p.paid_on = datetime.strptime(paid_on, "%Y-%m-%d").date() if paid_on else today()
             p.remarks = request.form.get(f"remarks_{emp.id}", "").strip() or None
             db.session.add(p)
             saved += 1
@@ -62,7 +62,7 @@ def run():
 
     rows = [(emp, calculate(emp, year, month)) for emp in employees]
     return render_template("salary/run.html", rows=rows, month_value=f"{year:04d}-{month:02d}",
-                           month_label=start.strftime("%B %Y"), today=date.today())
+                           month_label=start.strftime("%B %Y"), today=today())
 
 
 TOTAL_KEYS = ("earned", "ot_amount", "da_amount", "bonus", "advance_deducted", "other_deductions", "net_paid")

@@ -10,7 +10,7 @@ from sqlalchemy import func
 
 from .. import db
 from ..models import EXPENSE_CATEGORIES, Employee, Vehicle, VehicleExpense
-from ..utils import month_bounds, owner_required, parse_month, save_upload, to_dec
+from ..utils import month_bounds, owner_required, parse_month, save_upload, to_dec, today
 
 bp = Blueprint("vehicles", __name__, url_prefix="/vehicles")
 
@@ -158,6 +158,14 @@ def detail(vid):
 
 # ---------------- Expenses ----------------
 
+def _remove_file(name):
+    if name:
+        try:
+            os.remove(os.path.join(current_app.config["UPLOAD_FOLDER"], name))
+        except OSError:
+            pass
+
+
 def _can_edit(e):
     return current_user.is_owner or (e.submitted_by == current_user.id and e.status != "Approved")
 
@@ -165,8 +173,11 @@ def _can_edit(e):
 def _fill_expense(e, f, files):
     e.vehicle_id = _int(f.get("vehicle_id"))
     e.category = f.get("category") if f.get("category") in EXPENSE_CATEGORIES else "Other"
-    d = f.get("date")
-    e.date = datetime.strptime(d, "%Y-%m-%d").date() if d else date.today()
+    if current_user.is_owner:
+        d = f.get("date")
+        e.date = datetime.strptime(d, "%Y-%m-%d").date() if d else today()
+    elif not e.id:
+        e.date = today()  # supervisors: always today's date (India time); time is kept in created_at
     e.amount = to_dec(f.get("amount"))
     e.litres = to_dec(f.get("litres")) if e.category == "Diesel" and f.get("litres") else None
     e.odometer = _int(f.get("odometer"))
@@ -177,9 +188,13 @@ def _fill_expense(e, f, files):
     e.description = f.get("description", "").strip() or None
     e.payment_mode = f.get("payment_mode", "Cash")
     e.driver_id = _int(f.get("driver_id"))
-    up = files.get("slip")
-    if up and up.filename:
+    up = next((files.get(k) for k in ("slip_camera", "slip_file", "slip")
+               if files.get(k) and files.get(k).filename), None)
+    if up:
+        old = e.slip_file
         e.slip_file = save_upload(up, prefix=e.category.lower())
+        if old and old != e.slip_file:
+            _remove_file(old)
 
 
 def _validate(e):
@@ -187,7 +202,7 @@ def _validate(e):
         return "Choose a vehicle"
     if e.amount <= 0:
         return "Amount must be greater than 0"
-    if e.date > date.today():
+    if e.date > today():
         return "Date cannot be in the future"
     if e.category == "Diesel" and not e.slip_file:
         return "Diesel entries need a photo of the bill slip"
@@ -197,7 +212,7 @@ def _validate(e):
 @bp.route("/expenses/new", methods=["GET", "POST"])
 @login_required
 def expense_new():
-    e = VehicleExpense(date=date.today(), category=request.args.get("category", "Diesel"),
+    e = VehicleExpense(date=today(), category=request.args.get("category", "Diesel"),
                        vehicle_id=_int(request.args.get("vehicle")))
     if request.method == "POST":
         try:
@@ -262,6 +277,7 @@ def expense_delete(eid):
     e = db.get_or_404(VehicleExpense, eid)
     if not (current_user.is_owner or (e.submitted_by == current_user.id and e.status == "Pending")):
         abort(403)
+    _remove_file(e.slip_file)
     db.session.delete(e)
     db.session.commit()
     flash("Expense deleted", "success")

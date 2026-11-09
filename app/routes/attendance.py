@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 
 from .. import db
 from ..models import ATTENDANCE_STATUSES, Attendance, Employee
-from ..utils import month_bounds, parse_month, to_dec
+from ..utils import month_bounds, owner_required, parse_month, to_dec, today
 
 bp = Blueprint("attendance", __name__, url_prefix="/attendance")
 
@@ -14,14 +14,19 @@ def _parse_date(value):
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except (TypeError, ValueError):
-        return date.today()
+        return today()
 
 
 @bp.route("/", methods=["GET", "POST"])
 @login_required
 def daily():
     day = _parse_date(request.values.get("date"))
-    if day > date.today():
+    # Supervisors can only work on today's attendance (India time); owners can pick any past date.
+    if not current_user.is_owner and day != today():
+        if request.values.get("date"):
+            flash("Supervisors can mark attendance only for today", "error")
+        return redirect(url_for("attendance.daily"))
+    if day > today():
         flash("Cannot mark attendance for a future date", "error")
         return redirect(url_for("attendance.daily"))
 
@@ -40,6 +45,7 @@ def daily():
             rec.da_amount = max(to_dec(request.form.get(f"da_{emp.id}")), 0)
             rec.remarks = request.form.get(f"remarks_{emp.id}", "").strip() or None
             rec.marked_by = current_user.id
+            rec.marked_at = datetime.utcnow()
             db.session.add(rec)
             saved += 1
         db.session.commit()
@@ -49,11 +55,12 @@ def daily():
     return render_template("attendance/daily.html", day=day, employees=employees,
                            existing=existing, statuses=ATTENDANCE_STATUSES,
                            prev_day=day - timedelta(days=1),
-                           next_day=day + timedelta(days=1) if day < date.today() else None)
+                           next_day=day + timedelta(days=1) if day < today() else None)
 
 
 @bp.route("/month")
 @login_required
+@owner_required
 def monthly():
     year, month = parse_month(request.args.get("month"))
     start, end, days = month_bounds(year, month)

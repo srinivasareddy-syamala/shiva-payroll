@@ -7,6 +7,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db, login_manager
 
+
+def _today():
+    from .utils import today
+    return today()
+
 # ---------- Users ----------
 
 class User(UserMixin, db.Model):
@@ -47,7 +52,7 @@ class Employee(db.Model):
     rate = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # monthly salary or daily wage
     ot_rate = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # per overtime hour
     vehicle_no = db.Column(db.String(20))
-    joining_date = db.Column(db.Date, default=date.today)
+    joining_date = db.Column(db.Date, default=_today)
     active = db.Column(db.Boolean, nullable=False, default=True)
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -114,6 +119,8 @@ class Attendance(db.Model):
     da_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # day allowance (long trips etc.)
     remarks = db.Column(db.String(200))
     marked_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    marked_at = db.Column(db.DateTime)  # UTC time the entry was last saved
+    marker = db.relationship("User", foreign_keys=[marked_by])
 
 
 # ---------- Advances ----------
@@ -122,7 +129,7 @@ class Advance(db.Model):
     __tablename__ = "advances"
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False, index=True)
-    date = db.Column(db.Date, nullable=False, default=date.today)
+    date = db.Column(db.Date, nullable=False, default=_today)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     mode = db.Column(db.String(20), default="Cash")
     reason = db.Column(db.String(200))
@@ -151,7 +158,7 @@ class SalaryPayment(db.Model):
     other_deductions = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     net_paid = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     payment_mode = db.Column(db.String(20), default="Cash")  # Cash | UPI | Bank
-    paid_on = db.Column(db.Date, default=date.today)
+    paid_on = db.Column(db.Date, default=_today)
     remarks = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -229,7 +236,7 @@ class VehicleExpense(db.Model):
     __tablename__ = "vehicle_expenses"
     id = db.Column(db.Integer, primary_key=True)
     vehicle_id = db.Column(db.Integer, db.ForeignKey("vehicles.id"), nullable=False, index=True)
-    date = db.Column(db.Date, nullable=False, default=date.today, index=True)
+    date = db.Column(db.Date, nullable=False, default=_today, index=True)
     category = db.Column(db.String(20), nullable=False)          # Diesel | Repair | Loading | Other
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     litres = db.Column(db.Numeric(8, 2))                         # diesel

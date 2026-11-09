@@ -26,9 +26,11 @@ def create_app(config_class=Config):
     from .cli import register_cli
     register_cli(app)
 
-    from .utils import inr, days
+    from .utils import inr, days, localtime, today
     app.jinja_env.filters["inr"] = inr
     app.jinja_env.filters["days"] = days
+    app.jinja_env.filters["localtime"] = localtime
+    app.jinja_env.globals["local_today"] = today
 
     @app.context_processor
     def inject_company():

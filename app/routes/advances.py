@@ -5,7 +5,7 @@ from flask_login import login_required
 
 from .. import db
 from ..models import Advance, Employee
-from ..utils import month_bounds, owner_required, parse_month, to_dec
+from ..utils import month_bounds, owner_required, parse_month, to_dec, today
 
 bp = Blueprint("advances", __name__, url_prefix="/advances")
 
@@ -24,7 +24,7 @@ def index():
             adv = Advance(
                 employee_id=emp.id,
                 amount=amount,
-                date=datetime.strptime(d, "%Y-%m-%d").date() if d else date.today(),
+                date=datetime.strptime(d, "%Y-%m-%d").date() if d else today(),
                 mode=request.form.get("mode", "Cash"),
                 reason=request.form.get("reason", "").strip() or None,
             )
@@ -43,7 +43,7 @@ def index():
     return render_template("advances/index.html", advances=advances, employees=employees,
                            outstanding=outstanding, total=sum(a.amount for a in advances),
                            month_value=f"{year:04d}-{month:02d}",
-                           month_label=start.strftime("%B %Y"), today=date.today())
+                           month_label=start.strftime("%B %Y"), today=today())
 
 
 @bp.route("/<int:adv_id>/delete", methods=["POST"])

@@ -11,7 +11,7 @@
   </div>
 </div>
 
-<form class="flex flex-wrap gap-2 mb-4 text-sm">
+<form class="grid grid-cols-2 md:flex md:flex-wrap gap-2 mb-4 text-sm">
   <input type="month" name="month" value="{{ month_value }}" class="border border-slate-300 rounded-lg px-3 py-2">
   <select name="vehicle" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">All vehicles</option>
     {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if args.get('vehicle') == v.id|string }}>{{ v.number }}</option>{% endfor %}</select>
@@ -19,10 +19,41 @@
     {% for c in categories %}<option {{ 'selected' if args.get('category') == c }}>{{ c }}</option>{% endfor %}</select>
   <select name="status" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">Any status</option>
     {% for s in ['Pending', 'Approved', 'Rejected'] %}<option {{ 'selected' if args.get('status') == s }}>{{ s }}</option>{% endfor %}</select>
-  <button class="border border-slate-300 bg-white rounded-lg px-4 py-2">Filter</button>
+  <button class="border border-slate-300 bg-white rounded-lg px-4 py-2 font-semibold">Filter</button>
 </form>
 
-<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+<!-- phone: cards -->
+<div class="md:hidden space-y-3">
+  {% for e in items %}
+  <div class="bg-white rounded-2xl border {{ 'border-amber-200' if e.status == 'Pending' else 'border-slate-200' }} shadow-sm p-3">
+    <div class="flex justify-between items-start gap-2">
+      <div>
+        <div class="font-semibold">{{ categories[e.category] }} {{ e.category }} · {{ e.vehicle.number }}</div>
+        <div class="text-xs text-slate-500">{{ e.date.strftime('%d %b %Y') }}{% if e.created_at %} · {{ e.created_at|localtime('%I:%M %p') }}{% endif %}{% if current_user.is_owner and e.submitter %} · {{ e.submitter.username }}{% endif %}</div>
+      </div>
+      <div class="text-right"><div class="font-bold">{{ e.amount|inr }}</div>{{ badge(e.status) }}</div>
+    </div>
+    <div class="text-xs text-slate-600 mt-1">
+      {% if e.litres %}{{ e.litres|days }} L @ ₹{{ e.rate_per_litre }}{% endif %}{% if e.birds %}{{ e.birds }} birds{% if e.labourers %} · {{ e.labourers }} workers{% endif %}{% endif %}{% if e.odometer %} · {{ e.odometer }} km{% endif %}{% if e.vendor %} · {{ e.vendor }}{% endif %}
+      {% if e.description %}<div class="text-slate-400">{{ e.description }}</div>{% endif %}
+      {% if e.status == 'Rejected' and e.review_note %}<div class="text-red-600 font-semibold">Reason: {{ e.review_note }}</div>{% endif %}
+    </div>
+    <div class="flex gap-4 mt-2 text-sm">
+      {% if e.slip_file %}<a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700">📎 Bill</a>{% endif %}
+      {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status != 'Approved') %}
+        <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.full_path) }}" class="text-blue-700">{{ 'Correct & resend' if e.status == 'Rejected' else 'Edit' }}</a>{% endif %}
+      {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status == 'Pending') %}
+        <form method="post" action="{{ url_for('vehicles.expense_delete', eid=e.id) }}" onsubmit="return confirm('Delete this expense?')"><button class="text-red-500">Delete</button></form>{% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400">No expenses for this filter.</div>
+  {% endfor %}
+  {% if items and current_user.is_owner %}<div class="text-right font-bold px-1">Approved total: {{ total|inr }}</div>{% endif %}
+</div>
+
+<!-- desktop: table -->
+<div class="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
   <table class="w-full text-sm">
     <thead class="bg-blue-900 text-blue-50 text-left">
       <tr><th class="px-3 py-3">Date</th><th class="px-3 py-3">Vehicle</th><th class="px-3 py-3">Type</th><th class="px-3 py-3">Details</th>
@@ -41,7 +72,7 @@
           {% if e.vendor %} · {{ e.vendor }}{% endif %}
           {% if e.description %}<div class="text-xs text-slate-400">{{ e.description }}</div>{% endif %}
           {% if e.status == 'Rejected' and e.review_note %}<div class="text-xs text-red-600">Reason: {{ e.review_note }}</div>{% endif %}
-          {% if current_user.is_owner and e.submitter %}<div class="text-[11px] text-slate-400">by {{ e.submitter.username }}</div>{% endif %}
+          <div class="text-[11px] text-slate-400">{% if e.created_at %}entered {{ e.created_at|localtime }}{% endif %}{% if current_user.is_owner and e.submitter %} · by {{ e.submitter.username }}{% endif %}</div>
         </td>
         <td class="px-3 py-2 text-right font-semibold whitespace-nowrap">{{ e.amount|inr }}</td>
         <td class="px-3 py-2">{% if e.slip_file %}<a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700">📎 View</a>{% else %}<span class="text-slate-300">—</span>{% endif %}</td>

@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from .. import db
 from ..models import ATTENDANCE_STATUSES, Advance, Attendance, Employee, SalaryPayment
 from ..payroll import attendance_summary
-from ..utils import month_bounds, owner_required, parse_month, to_dec
+from ..utils import month_bounds, owner_required, parse_month, to_dec, today
 
 bp = Blueprint("employees", __name__, url_prefix="/employees")
 
@@ -21,7 +21,7 @@ def _fill(emp, f):
     emp.ot_rate = to_dec(f.get("ot_rate"))
     emp.vehicle_no = f.get("vehicle_no", "").strip() or None
     jd = f.get("joining_date")
-    emp.joining_date = datetime.strptime(jd, "%Y-%m-%d").date() if jd else date.today()
+    emp.joining_date = datetime.strptime(jd, "%Y-%m-%d").date() if jd else today()
     emp.active = f.get("active") == "on"
     emp.notes = f.get("notes", "").strip() or None
 
@@ -47,7 +47,7 @@ def index():
 @login_required
 @owner_required
 def new():
-    emp = Employee(active=True, joining_date=date.today())
+    emp = Employee(active=True, joining_date=today())
     if request.method == "POST":
         _fill(emp, request.form)
         if not emp.name:
@@ -86,11 +86,11 @@ def ledger(emp_id):
     summary = attendance_summary(emp, year, month)
     records = {a.date: a for a in Attendance.query.filter(
         Attendance.employee_id == emp.id, Attendance.date.between(start, end)).all()}
-    today = date.today()
+    td = today()
     day_rows = []
     for i in range(ndays):
         d = start + timedelta(days=i)
-        if d > today:
+        if d > td:
             break
         day_rows.append((d, records.get(d)))
     advances = emp.advances.order_by(Advance.date.desc()).all()
@@ -133,6 +133,7 @@ def day_update(emp_id, day):
         rec.da_amount = max(to_dec(request.form.get("da")), 0)
         rec.remarks = request.form.get("remarks", "").strip() or None
         rec.marked_by = current_user.id
+        rec.marked_at = datetime.utcnow()
         db.session.add(rec)
         db.session.commit()
         flash(f"Saved {d.strftime('%d %b %Y')}", "success")
@@ -140,3 +141,24 @@ def day_update(emp_id, day):
     if SalaryPayment.query.filter_by(employee_id=emp.id, year=d.year, month=d.month).first():
         flash("Salary for this month was already saved. Open Salary and press Save again to update the slip.", "error")
     return redirect(url_for("employees.ledger", emp_id=emp.id, month=month_value) + f"#d{day}")
+
+
+@bp.route("/<int:emp_id>/delete", methods=["POST"])
+@login_required
+@owner_required
+def delete(emp_id):
+    """Delete an employee only if no salary or advance was ever recorded (otherwise mark inactive)."""
+    from ..models import Vehicle, VehicleExpense
+    emp = db.get_or_404(Employee, emp_id)
+    if emp.payments.count() or emp.advances.count():
+        emp.active = False
+        db.session.commit()
+        flash(f"{emp.name} has salary/advance records, so they were marked inactive instead of deleted", "error")
+        return redirect(url_for("employees.ledger", emp_id=emp.id))
+    Vehicle.query.filter_by(driver_id=emp.id).update({"driver_id": None})
+    VehicleExpense.query.filter_by(driver_id=emp.id).update({"driver_id": None})
+    name = emp.name
+    db.session.delete(emp)  # attendance rows are removed with the employee
+    db.session.commit()
+    flash(f"Employee {name} deleted", "success")
+    return redirect(url_for("employees.index", show="all"))

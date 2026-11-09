@@ -19,7 +19,8 @@ def login():
         elif user and user.check_password(request.form.get("password", "")):
             login_user(user, remember=True)
             return redirect(request.args.get("next") or url_for("main.dashboard"))
-        flash("Invalid username or password", "error")
+        else:
+            flash("Invalid username or password", "error")
     return render_template("login.html")
 
 

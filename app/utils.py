@@ -1,10 +1,36 @@
 import calendar
-from datetime import date
+import os
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import wraps
 
 from flask import abort
 from flask_login import current_user
+
+
+def _tz():
+    from zoneinfo import ZoneInfo
+    try:
+        return ZoneInfo(os.environ.get("APP_TIMEZONE", "Asia/Kolkata"))
+    except Exception:
+        from datetime import timedelta
+        return timezone(timedelta(hours=5, minutes=30))
+
+
+def today():
+    """Today's date in India time, whatever timezone the server runs in."""
+    return datetime.now(_tz()).date()
+
+
+def now_local():
+    return datetime.now(_tz())
+
+
+def localtime(dt, fmt="%d %b, %I:%M %p"):
+    """Format a UTC timestamp stored in the DB as India time."""
+    if not dt:
+        return ""
+    return dt.replace(tzinfo=timezone.utc).astimezone(_tz()).strftime(fmt).replace(" 0", " ").lstrip("0")
 
 
 def owner_required(f):
@@ -66,7 +92,7 @@ def parse_month(value):
         y, m = value.split("-")
         return int(y), int(m)
     except (AttributeError, ValueError):
-        t = date.today()
+        t = today()
         return t.year, t.month
 
 
@@ -86,7 +112,7 @@ def save_upload(file_storage, prefix="slip"):
         raise ValueError("Only photos (JPG/PNG) or PDF files are allowed")
     folder = current_app.config["UPLOAD_FOLDER"]
     os.makedirs(folder, exist_ok=True)
-    name = f"{prefix}_{date.today():%Y%m%d}_{uuid.uuid4().hex[:10]}"
+    name = f"{prefix}_{today():%Y%m%d}_{uuid.uuid4().hex[:10]}"
     if ext == ".pdf":
         fname = name + ".pdf"
         file_storage.save(os.path.join(folder, fname))

@@ -6,8 +6,8 @@
 {% endif %}
 {% if not current_user.is_owner %}<p class="text-sm text-slate-500 mb-4">Your entry goes to the owner for approval.</p>{% else %}<div class="mb-4"></div>{% endif %}
 
-{% set inp = "w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" %}
-<form method="post" enctype="multipart/form-data" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 max-w-3xl">
+{% set inp = "w-full border border-slate-300 rounded-lg px-3 py-2.5 text-base focus:ring-2 focus:ring-blue-500 outline-none" %}
+<form method="post" enctype="multipart/form-data" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 max-w-3xl">
   <input type="hidden" name="next" value="{{ next or '' }}">
   <!-- category tabs -->
   <div class="grid grid-cols-4 gap-2 mb-5">
@@ -23,8 +23,18 @@
     <div><label class="block text-sm font-medium mb-1">Vehicle *</label>
       <select name="vehicle_id" required class="{{ inp }}"><option value="">Select vehicle…</option>
         {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if e.vehicle_id == v.id }}>{{ v.number }}{% if v.driver %} — {{ v.driver.name }}{% endif %}</option>{% endfor %}</select></div>
+    {% if current_user.is_owner %}
     <div><label class="block text-sm font-medium mb-1">Date *</label>
-      <input type="date" name="date" value="{{ e.date.isoformat() if e.date else '' }}" max="{{ e.date.today().isoformat() if e.date else '' }}" class="{{ inp }}"></div>
+      <input type="date" name="date" value="{{ e.date.isoformat() if e.date else '' }}" max="{{ local_today().isoformat() }}" class="{{ inp }}"></div>
+    {% else %}
+    <div><span class="block text-sm font-medium mb-1">Date &amp; time</span>
+      <div class="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+        <span class="font-semibold text-blue-900">{{ (e.date or local_today()).strftime('%a, %d %b %Y') }}</span>
+        {% if e.id and e.created_at %}<span class="text-sm text-blue-800">{{ e.created_at|localtime('%I:%M %p') }}</span>
+        {% else %}<span class="text-sm text-blue-800 tabular-nums" id="clock"></span>{% endif %}
+      </div>
+      <p class="text-[11px] text-slate-500 mt-1">Entries are saved with today's date and the current time.</p></div>
+    {% endif %}
     <div><label class="block text-sm font-medium mb-1">Amount ₹ *</label>
       <input name="amount" value="{{ e.amount|days if e.amount else '' }}" inputmode="decimal" required class="{{ inp }} text-lg font-semibold" id="amount"></div>
     <div><label class="block text-sm font-medium mb-1">Driver</label>
@@ -54,13 +64,32 @@
     <div class="md:col-span-2"><label class="block text-sm font-medium mb-1">Description</label>
       <input name="description" value="{{ e.description or '' }}" placeholder="e.g. Clutch plate replaced / Farm → Hyderabad market" class="{{ inp }}"></div>
 
-    <!-- Slip upload -->
-    <div class="md:col-span-2 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-4">
-      <label class="block text-sm font-semibold text-blue-900 mb-1">📷 Bill / slip photo <span id="slipReq" class="text-red-600">* required for diesel</span></label>
-      <input type="file" name="slip" accept="image/*,application/pdf" class="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-blue-700 file:px-4 file:py-2 file:text-white">
+    <!-- Slip upload: camera or file -->
+    <div class="md:col-span-2 rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-4">
+      <div class="text-sm font-semibold text-blue-900 mb-3">🧾 Bill / slip <span id="slipReq" class="text-red-600">* required for diesel</span></div>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="cursor-pointer flex flex-col items-center justify-center gap-1 rounded-xl bg-blue-700 hover:bg-blue-800 text-white py-4 shadow">
+          <span class="text-2xl">📷</span><span class="font-semibold text-sm">Take photo</span>
+          <input type="file" name="slip_camera" id="slipCamera" accept="image/*" capture="environment" class="sr-only">
+        </label>
+        <label class="cursor-pointer flex flex-col items-center justify-center gap-1 rounded-xl bg-white border-2 border-blue-700 text-blue-700 hover:bg-blue-50 py-4">
+          <span class="text-2xl">🖼️</span><span class="font-semibold text-sm">Upload file</span>
+          <input type="file" name="slip_file" id="slipFile" accept="image/*,application/pdf" class="sr-only">
+        </label>
+      </div>
+      <div id="slipPreview" class="hidden mt-3 flex items-center gap-3 rounded-xl bg-white border border-emerald-200 p-2">
+        <img id="slipImg" alt="" class="w-16 h-20 object-cover rounded-lg hidden">
+        <span id="slipPdf" class="w-16 h-20 hidden items-center justify-center text-3xl bg-slate-100 rounded-lg">📄</span>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-semibold text-emerald-700">✓ Bill attached</div>
+          <div id="slipName" class="text-xs text-slate-500 truncate"></div>
+        </div>
+        <button type="button" id="slipClear" class="text-xs text-red-600 px-2">Remove</button>
+      </div>
       {% if e.slip_file %}
-      <p class="text-xs text-slate-600 mt-2">Current: <a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700 underline">view slip</a> — choose a new file only to replace it.</p>
+      <p class="text-xs text-slate-600 mt-2">Current bill: <a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700 underline">view</a> — take or upload a new one only to replace it.</p>
       {% endif %}
+      <p class="text-[11px] text-slate-500 mt-2">Take photo opens the phone camera. Upload file lets you pick a photo from the gallery or a PDF.</p>
     </div>
 
     {% if current_user.is_owner and not e.id %}
@@ -71,7 +100,7 @@
   </div>
 
   <div class="flex flex-wrap gap-3 mt-6">
-    <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-6 py-2.5 font-semibold">Save</button>
+    <button class="flex-1 sm:flex-none bg-blue-700 hover:bg-blue-800 text-white rounded-xl px-6 py-3 font-semibold">Save</button>
     {% if not e.id %}<button name="again" value="1" class="border border-blue-700 text-blue-700 rounded-lg px-4 py-2.5 font-semibold">Save &amp; add another</button>{% endif %}
     <a href="{{ next or url_for('vehicles.expenses') }}" class="px-4 py-2.5 text-slate-500">Cancel</a>
   </div>
@@ -98,5 +127,27 @@ function calc() {
 document.querySelectorAll('input[name=category]').forEach(r => r.addEventListener('change', showCat));
 ['amount', 'litres', 'birds'].forEach(id => document.getElementById(id).addEventListener('input', calc));
 showCat();
+
+const cam = document.getElementById('slipCamera'), fil = document.getElementById('slipFile');
+function showSlip(input, other) {
+  const f = input.files[0];
+  if (!f) return;
+  other.value = '';                       // only one bill is sent
+  document.getElementById('slipPreview').classList.remove('hidden');
+  document.getElementById('slipName').textContent = f.name + ' · ' + Math.round(f.size / 1024) + ' KB';
+  const img = document.getElementById('slipImg'), pdf = document.getElementById('slipPdf');
+  if (f.type.startsWith('image/')) { img.src = URL.createObjectURL(f); img.classList.remove('hidden'); pdf.classList.add('hidden'); pdf.classList.remove('flex'); }
+  else { img.classList.add('hidden'); pdf.classList.remove('hidden'); pdf.classList.add('flex'); }
+}
+cam.addEventListener('change', () => showSlip(cam, fil));
+fil.addEventListener('change', () => showSlip(fil, cam));
+document.getElementById('slipClear').addEventListener('click', () => {
+  cam.value = ''; fil.value = ''; document.getElementById('slipPreview').classList.add('hidden');
+});
+(function tick() {
+  const el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-IN', {timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit'});
+  setTimeout(tick, 15000);
+})();
 </script>
 {% endblock %}

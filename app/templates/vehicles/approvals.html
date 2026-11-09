@@ -15,11 +15,11 @@
 <div class="grid md:grid-cols-2 gap-4">
   {% for e in items %}
   <div class="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
-    <div class="flex">
+    <div class="flex flex-col sm:flex-row">
       <a href="{{ url_for('vehicles.slip', eid=e.id) if e.slip_file else '#' }}" target="_blank"
-         class="w-32 shrink-0 bg-slate-100 flex items-center justify-center border-r border-slate-200">
+         class="sm:w-32 shrink-0 bg-slate-100 flex items-center justify-center border-b sm:border-b-0 sm:border-r border-slate-200 min-h-[80px]">
         {% if e.slip_file and not e.slip_file.endswith('.pdf') %}
-          <img src="{{ url_for('vehicles.slip', eid=e.id) }}" alt="slip" class="w-32 h-full max-h-48 object-cover">
+          <img src="{{ url_for('vehicles.slip', eid=e.id) }}" alt="slip" class="w-full sm:w-32 h-40 sm:h-full sm:max-h-48 object-cover object-top">
         {% elif e.slip_file %}<span class="text-3xl">📄</span><span class="sr-only">PDF</span>
         {% else %}<span class="text-xs text-slate-400 p-2 text-center">No slip</span>{% endif %}
       </a>
@@ -37,7 +37,7 @@
           {% if e.birds %}<div>{{ e.birds }} birds{% if e.labourers %} · {{ e.labourers }} workers{% endif %}</div>{% endif %}
           {% if e.vendor or e.bill_no %}<div>{{ e.vendor or '' }}{% if e.bill_no %} · Bill {{ e.bill_no }}{% endif %}</div>{% endif %}
           {% if e.description %}<div>{{ e.description }}</div>{% endif %}
-          <div>{{ e.payment_mode }}{% if e.driver %} · Driver {{ e.driver.name }}{% endif %} · by {{ e.submitter.username if e.submitter else '?' }}</div>
+          <div>{{ e.payment_mode }}{% if e.driver %} · Driver {{ e.driver.name }}{% endif %} · by {{ e.submitter.username if e.submitter else '?' }}{% if e.created_at %} at {{ e.created_at|localtime }}{% endif %}</div>
         </div>
         <form method="post" class="mt-3 flex flex-wrap gap-2">
           <input type="hidden" name="id" value="{{ e.id }}">
