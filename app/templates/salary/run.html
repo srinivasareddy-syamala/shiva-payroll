@@ -12,7 +12,8 @@
       <input name="q" value="{{ q }}" placeholder="Name…" class="border border-slate-300 rounded-lg px-3 py-2 w-32">
       <button class="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">Apply</button>
     </form>
-    <a href="{{ url_for('salary.register', month=month_value) }}" class="border bg-white rounded-lg px-3 py-2 text-sm">Register</a>
+    <a href="{{ url_for('salary.register', month=month_value) }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">Register</a>
+    <a href="{{ url_for('salary.report') }}" class="bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm">📊 Salary &amp; advances report</a>
   </div>
 </div>
 <p class="text-sm mb-2"><b>{{ counts.total }}</b> employees · <span class="text-emerald-700">{{ counts.paid }} paid</span> · <span class="text-slate-600">{{ counts.total - counts.paid }} not paid</span>{% if counts.changed %} · <span class="text-amber-700">{{ counts.changed }} attendance changed</span>{% endif %}</p>

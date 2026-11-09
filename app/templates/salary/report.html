@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% from "_range_filter.html" import range_filter %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+  <h1 class="text-xl sm:text-2xl font-bold text-blue-950">Salary &amp; advances report</h1>
+  <div class="flex flex-wrap gap-2 text-sm">
+    <a href="{{ url_for('salary.run') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2">Salary run</a>
+    <a href="{{ url_for('salary.register') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2">Monthly register</a>
+    <a href="{{ url_for('salary.report_excel', **request.args) }}" class="bg-emerald-600 text-white rounded-lg px-3 py-2">⬇ Excel</a>
+  </div>
+</div>
+
+{% set extra %}
+  <select name="employee" class="col-span-2 md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">All employees</option>
+    {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if emp_id == e.id }}>{{ e.name }}</option>{% endfor %}</select>
+  <select name="type" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">All types</option>
+    {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp_type == t }}>{{ t }}</option>{% endfor %}</select>
+  <select name="mode" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">Any mode</option>
+    {% for m in ['Cash', 'UPI', 'Bank'] %}<option {{ 'selected' if mode == m }}>{{ m }}</option>{% endfor %}</select>
+  <input name="q" value="{{ q }}" placeholder="Name…" class="col-span-2 md:col-span-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+{% endset %}
+{{ range_filter(rng, extra) }}
+<p class="text-xs text-slate-500 -mt-2 mb-3">Salaries are counted by the date they were <b>paid</b>; advances by the date they were <b>given</b>.</p>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+  <div class="bg-blue-900 text-white rounded-2xl p-3">
+    <div class="text-[11px] uppercase text-blue-200">Salary paid (net)</div>
+    <div class="text-xl font-bold">{{ tot.net|inr }}</div>
+    <div class="text-xs text-blue-200">{{ tot.salary_count }} payment{{ 's' if tot.salary_count != 1 }}</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-orange-500 p-3">
+    <div class="text-[11px] uppercase text-slate-500">Advances given</div>
+    <div class="text-xl font-bold">{{ tot.advances|inr }}</div>
+    <div class="text-xs text-slate-400">{{ tot.adv_count }} entr{{ 'y' if tot.adv_count == 1 else 'ies' }}</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-3">
+    <div class="text-[11px] uppercase text-slate-500">Advance recovered</div>
+    <div class="text-xl font-bold">{{ tot.recovered|inr }}</div>
+    <div class="text-xs text-slate-400">from salaries</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-indigo-500 p-3">
+    <div class="text-[11px] uppercase text-slate-500">Total cash paid out</div>
+    <div class="text-xl font-bold">{{ tot.cash_out|inr }}</div>
+    <div class="text-xs text-slate-400">salary + advances</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-red-500 p-3 col-span-2 md:col-span-1">
+    <div class="text-[11px] uppercase text-slate-500">Outstanding now</div>
+    <div class="text-xl font-bold text-red-600">{{ tot.outstanding|inr }}</div>
+    <div class="text-xs text-slate-400">advance still to recover</div>
+  </div>
+</div>
+{% if tot.by_mode %}
+<div class="flex flex-wrap gap-2 text-xs mb-5">
+  {% for m, v in tot.by_mode|dictsort %}<span class="bg-white border border-slate-200 rounded-full px-3 py-1">{{ m }}: <b>{{ v|inr }}</b></span>{% endfor %}
+</div>
+{% endif %}
+
+<h2 class="font-semibold text-blue-950 mb-2">By employee</h2>
+<!-- phone -->
+<div class="md:hidden space-y-2 mb-6">
+  {% for r in rows %}
+  <a href="{{ url_for('employees.ledger', emp_id=r.emp.id) }}" class="block bg-white rounded-2xl border border-slate-200 p-3">
+    <div class="flex justify-between"><span class="font-semibold">{{ r.emp.name }} <span class="text-xs text-slate-400">{{ r.emp.emp_type }}</span></span>
+      <span class="font-bold">{{ r.cash_out|inr }}</span></div>
+    <div class="text-xs text-slate-500 mt-1">Salary {{ r.net|inr }}{% if r.months %} ({{ r.months|join(', ') }}){% endif %} · Advances {{ r.advances|inr }}{% if r.recovered %} · Recovered {{ r.recovered|inr }}{% endif %}</div>
+    {% if r.outstanding %}<div class="text-xs text-red-600 mt-0.5">Outstanding {{ r.outstanding|inr }}</div>{% endif %}
+  </a>
+  {% else %}<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400">Nothing in this range.</div>{% endfor %}
+</div>
+<!-- desktop -->
+<div class="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto mb-6">
+  <table class="w-full text-sm">
+    <thead class="bg-blue-900 text-blue-50">
+      <tr class="text-right"><th class="px-3 py-3 text-left">Employee</th><th class="px-3 py-3 text-left">Salary for</th><th class="px-3 py-3">Gross</th>
+        <th class="px-3 py-3">Adv. recovered</th><th class="px-3 py-3">Net salary</th><th class="px-3 py-3">Advances given</th>
+        <th class="px-3 py-3">Cash paid</th><th class="px-3 py-3">Outstanding</th></tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for r in rows %}
+      <tr class="text-right">
+        <td class="px-3 py-2 text-left"><a href="{{ url_for('employees.ledger', emp_id=r.emp.id) }}" class="font-medium text-blue-700">{{ r.emp.name }}</a> <span class="text-xs text-slate-400">{{ r.emp.emp_type }}</span></td>
+        <td class="px-3 py-2 text-left text-xs text-slate-500">{{ r.months|join(', ') or '—' }}</td>
+        <td class="px-3 py-2">{{ r.gross|inr if r.gross else '' }}</td>
+        <td class="px-3 py-2 text-emerald-700">{{ r.recovered|inr if r.recovered else '' }}</td>
+        <td class="px-3 py-2">{{ r.net|inr if r.net else '' }}</td>
+        <td class="px-3 py-2 text-orange-700">{{ r.advances|inr if r.advances else '' }}</td>
+        <td class="px-3 py-2 font-bold">{{ r.cash_out|inr }}</td>
+        <td class="px-3 py-2 {{ 'text-red-600 font-semibold' if r.outstanding > 0 }}">{{ r.outstanding|inr if r.outstanding else '' }}</td>
+      </tr>
+      {% else %}<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Nothing in this range.</td></tr>{% endfor %}
+    </tbody>
+    {% if rows %}
+    <tfoot class="bg-slate-50 font-bold text-right"><tr><td class="px-3 py-2 text-left" colspan="2">Total</td>
+      <td class="px-3 py-2">{{ tot.gross|inr }}</td><td class="px-3 py-2">{{ tot.recovered|inr }}</td><td class="px-3 py-2">{{ tot.net|inr }}</td>
+      <td class="px-3 py-2">{{ tot.advances|inr }}</td><td class="px-3 py-2">{{ tot.cash_out|inr }}</td><td class="px-3 py-2">{{ tot.outstanding|inr }}</td></tr></tfoot>
+    {% endif %}
+  </table>
+</div>
+
+<div class="grid md:grid-cols-2 gap-6">
+  <div>
+    <h2 class="font-semibold text-blue-950 mb-2">Salary payments · {{ rng.label }}</h2>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+      {% for p in pays %}
+      <div class="flex flex-wrap justify-between items-center gap-2 px-4 py-2">
+        <span>{{ p.paid_on.strftime('%d %b') if p.paid_on }} · <b>{{ p.employee.name }}</b>
+          <span class="text-slate-400 text-xs">for {{ '%02d/%04d'|format(p.month, p.year) }} · {{ p.payment_mode }}</span></span>
+        <span class="flex items-center gap-3 whitespace-nowrap"><b>{{ p.net_paid|inr }}</b>
+          <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="text-blue-700 text-xs">Slip</a>
+          <a href="{{ url_for('salary.share', payment_id=p.id) }}" class="text-emerald-600 text-xs font-semibold">WhatsApp</a></span>
+      </div>
+      {% else %}<div class="px-4 py-4 text-slate-400">No salary paid in this range.</div>{% endfor %}
+    </div>
+  </div>
+  <div>
+    <h2 class="font-semibold text-blue-950 mb-2">Advances given · {{ rng.label }}</h2>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y text-sm">
+      {% for a in advs %}
+      <div class="flex justify-between px-4 py-2">
+        <span>{{ a.date.strftime('%d %b') }} · <b>{{ a.employee.name }}</b> <span class="text-slate-400 text-xs">{{ a.mode }}{% if a.reason %} · {{ a.reason }}{% endif %}</span></span>
+        <b>{{ a.amount|inr }}</b>
+      </div>
+      {% else %}<div class="px-4 py-4 text-slate-400">No advances in this range.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

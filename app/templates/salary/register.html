@@ -13,8 +13,16 @@
       <button class="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">Apply</button>
     </form>
     <a href="{{ url_for('salary.register_excel', month=month_value) }}" class="bg-green-600 text-white rounded-lg px-3 py-2 text-sm">⬇ Excel</a>
-    <button onclick="window.print()" class="border bg-white rounded-lg px-3 py-2 text-sm">Print</button>
+    <button onclick="window.print()" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">Print</button>
+    <a href="{{ url_for('salary.report') }}" class="bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm">📊 Date-range report</a>
   </div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+  <div class="bg-blue-900 text-white rounded-2xl p-3"><div class="text-[11px] uppercase text-blue-200">Net salary · {{ payments|length }} paid</div><div class="text-xl font-bold">{{ totals.net_paid|inr }}</div></div>
+  <div class="bg-white rounded-2xl border border-slate-200 p-3"><div class="text-[11px] uppercase text-slate-500">Gross earned</div><div class="text-xl font-bold">{{ (totals.earned + totals.ot_amount + totals.da_amount + totals.bonus)|inr }}</div></div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-3"><div class="text-[11px] uppercase text-slate-500">Advance recovered</div><div class="text-xl font-bold">{{ totals.advance_deducted|inr }}</div></div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-orange-500 p-3"><div class="text-[11px] uppercase text-slate-500">Advances given this month</div><div class="text-xl font-bold">{{ totals.advances_given|inr }}</div></div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-red-500 p-3 col-span-2 md:col-span-1"><div class="text-[11px] uppercase text-slate-500">Outstanding now</div><div class="text-xl font-bold text-red-600">{{ totals.outstanding|inr }}</div></div>
 </div>
 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
   <table class="w-full text-sm">
