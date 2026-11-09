@@ -22,6 +22,15 @@ def dashboard():
     present_today = Attendance.query.filter(Attendance.date == td,
                                             Attendance.status.in_(["P", "H"])).count()
     stats = {"active": active, "marked_today": marked_today, "present_today": present_today}
+    from datetime import timedelta
+    wk = td - timedelta(days=td.weekday())
+    stats["week_start"] = wk
+    stats["worked_week"] = db.session.query(func.count(func.distinct(Attendance.employee_id))) \
+        .filter(Attendance.date.between(wk, td), Attendance.status.in_(["P", "H"])).scalar()
+    stats["da_week"] = db.session.query(func.coalesce(func.sum(Attendance.da_amount), 0)) \
+        .filter(Attendance.date.between(wk, td)).scalar()
+    stats["advances_week"] = db.session.query(func.coalesce(func.sum(Advance.amount), 0)) \
+        .filter(Advance.date.between(wk, td)).scalar()
 
     if True:
         stats["advances_month"] = db.session.query(func.coalesce(func.sum(Advance.amount), 0)) \

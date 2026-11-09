@@ -1,0 +1,23 @@
+{# Reusable date-range picker. Pass: rng (from parse_range), extra fields via caller block #}
+{% macro range_filter(rng, extra='') -%}
+<form class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 mb-4 no-print" id="rangeForm">
+  <div class="flex flex-wrap gap-1.5 mb-2">
+    {% for k, lbl in range_presets %}
+    <label class="cursor-pointer">
+      <input type="radio" name="range" value="{{ k }}" class="peer sr-only" {{ 'checked' if rng.key == k }}
+             onchange="document.getElementById('customDates').classList.toggle('hidden', this.value !== 'custom'); if (this.value !== 'custom') this.form.submit()">
+      <span class="inline-block px-3 py-1.5 rounded-full border border-slate-300 text-sm peer-checked:bg-blue-700 peer-checked:text-white peer-checked:border-blue-700">{{ lbl }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  <div class="grid grid-cols-2 md:flex md:flex-wrap gap-2 items-end">
+    <div id="customDates" class="col-span-2 grid grid-cols-2 gap-2 {{ '' if rng.key == 'custom' else 'hidden' }}">
+      <label class="text-xs text-slate-500">From<input type="date" name="from" value="{{ rng.start.isoformat() }}" class="block w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-slate-800"></label>
+      <label class="text-xs text-slate-500">To<input type="date" name="to" value="{{ rng.end.isoformat() }}" class="block w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-slate-800"></label>
+    </div>
+    {{ extra }}
+    <button class="col-span-2 md:col-span-1 bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-4 py-2 text-sm font-semibold">Apply</button>
+  </div>
+  <div class="text-xs text-slate-500 mt-2">Showing: <b class="text-slate-700">{{ rng.label }}</b></div>
+</form>
+{%- endmacro %}

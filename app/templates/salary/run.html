@@ -3,11 +3,20 @@
 <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
   <h1 class="text-2xl font-bold">Salary — {{ month_label }}</h1>
   <div class="flex items-center gap-2">
-    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border rounded-lg px-3 py-2"></form>
+    <form class="flex flex-wrap gap-2 text-sm">
+      <input type="month" name="month" value="{{ month_value }}" class="border border-slate-300 rounded-lg px-3 py-2">
+      <select name="type" class="border border-slate-300 rounded-lg px-2 py-2"><option value="">All types</option>
+        {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp_type == t }}>{{ t }}</option>{% endfor %}</select>
+      <select name="status" class="border border-slate-300 rounded-lg px-2 py-2">
+        {% for v, l in [('', 'Paid & unpaid'), ('unpaid', 'Not paid yet'), ('paid', 'Paid'), ('changed', 'Attendance changed')] %}<option value="{{ v }}" {{ 'selected' if status == v }}>{{ l }}</option>{% endfor %}</select>
+      <input name="q" value="{{ q }}" placeholder="Name…" class="border border-slate-300 rounded-lg px-3 py-2 w-32">
+      <button class="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">Apply</button>
+    </form>
     <a href="{{ url_for('salary.register', month=month_value) }}" class="border bg-white rounded-lg px-3 py-2 text-sm">Register</a>
   </div>
 </div>
-<p class="text-sm text-slate-500 mb-4">Earned, OT and DA are calculated from attendance. Advance deduction is pre-filled with the outstanding balance (capped at gross) — change it if you want to recover in instalments. Tick the employees to pay and press Save.</p>
+<p class="text-sm mb-2"><b>{{ counts.total }}</b> employees · <span class="text-emerald-700">{{ counts.paid }} paid</span> · <span class="text-slate-600">{{ counts.total - counts.paid }} not paid</span>{% if counts.changed %} · <span class="text-amber-700">{{ counts.changed }} attendance changed</span>{% endif %}</p>
+<p class="text-sm text-slate-500 mb-4">Nothing is ticked by default: tick the employees you want to pay (or use the box in the header to tick all shown). Earned, OT and DA are calculated from attendance. Advance deduction is pre-filled with the outstanding balance (capped at gross) — change it if you want to recover in instalments. Tick the employees to pay and press Save.</p>
 
 {% set num = "w-20 border rounded px-2 py-1 text-right" %}
 <form method="post">
@@ -16,7 +25,7 @@
     <table class="w-full text-sm">
       <thead class="bg-blue-900 text-blue-50 text-left">
         <tr>
-          <th class="px-3 py-2"><input type="checkbox" onclick="document.querySelectorAll('.paychk').forEach(c=>c.checked=this.checked)"></th>
+          <th class="px-3 py-2"><input type="checkbox" class="w-4 h-4" title="Tick / untick all shown" onclick="document.querySelectorAll('.paychk').forEach(c=>c.checked=this.checked); recalc()"></th>
           <th class="px-3 py-2">Employee</th>
           <th class="px-3 py-2 text-right">Days</th>
           <th class="px-3 py-2 text-right">Earned</th>
@@ -36,7 +45,7 @@
         {% set p = c.existing %}
         {% set locked = p and not can_change(p.paid_on) %}
         <tr class="{{ 'bg-amber-50' if c.stale else ('bg-emerald-50' if p) }}" data-row data-gross="{{ c.gross }}">
-          <td class="px-3 py-2">{% if locked %}<span title="Saved on an earlier day – owner only">🔒</span>{% else %}<input type="checkbox" name="pay" value="{{ e.id }}" class="paychk" {{ 'checked' if not p or c.stale }}>{% endif %}</td>
+          <td class="px-3 py-2">{% if locked %}<span title="Saved on an earlier day – owner only">🔒</span>{% else %}<input type="checkbox" name="pay" value="{{ e.id }}" class="paychk w-4 h-4">{% endif %}</td>
           <td class="px-3 py-2">
             <a href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}" class="font-medium text-blue-700">{{ e.name }}</a>
             <div class="text-xs text-slate-400">{{ e.rate|inr }}/{{ 'mo' if e.pay_type == 'Monthly' else 'day' }}
@@ -81,7 +90,7 @@
     {% else %}
     <span class="text-sm">Paid on <b>{{ today.strftime('%d %b %Y') }}</b> (today)</span>
     {% endif %}
-    <button class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-2 font-semibold">Save salary for ticked</button>
+    <button id="saveBtn" class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg px-6 py-2 font-semibold" disabled>Tick employees to pay</button>
     <span class="text-xs text-slate-500">Saving a paid row again updates it.</span>
   </div>
 </form>
@@ -99,6 +108,9 @@ function recalc() {
     if (tr.querySelector('.paychk').checked) grand += net;
   });
   document.getElementById('grand').textContent = fmt(grand);
+  const n = document.querySelectorAll('.paychk:checked').length, btn = document.getElementById('saveBtn');
+  btn.disabled = n === 0;
+  btn.textContent = n ? `Save salary for ${n} employee${n > 1 ? 's' : ''}` : 'Tick employees to pay';
 }
 document.querySelectorAll('.calc, .paychk').forEach(el => el.addEventListener('input', recalc));
 document.querySelectorAll('.paychk, thead input').forEach(el => el.addEventListener('change', recalc));

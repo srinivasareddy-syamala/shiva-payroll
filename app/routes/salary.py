@@ -64,9 +64,21 @@ def run():
             flash(f"{skipped} salary entr{'y' if skipped == 1 else 'ies'} saved on an earlier day {'was' if skipped == 1 else 'were'} not changed (only the owner can change it)", "error")
         return redirect(url_for("salary.run", month=f"{year:04d}-{month:02d}"))
 
-    rows = [(emp, calculate(emp, year, month)) for emp in employees]
+    emp_type, q, status = request.args.get("type", ""), request.args.get("q", "").strip(), request.args.get("status", "")
+    shown = [e for e in employees if (emp_type not in ("Driver", "Worker") or e.emp_type == emp_type)
+             and (not q or q.lower() in e.name.lower())]
+    rows = [(emp, calculate(emp, year, month)) for emp in shown]
+    if status == "unpaid":
+        rows = [r for r in rows if not r[1]["existing"]]
+    elif status == "paid":
+        rows = [r for r in rows if r[1]["existing"]]
+    elif status == "changed":
+        rows = [r for r in rows if r[1]["stale"]]
+    counts = {"total": len(rows), "paid": sum(1 for r in rows if r[1]["existing"]),
+              "changed": sum(1 for r in rows if r[1]["stale"])}
     return render_template("salary/run.html", rows=rows, month_value=f"{year:04d}-{month:02d}",
-                           month_label=start.strftime("%B %Y"), today=today())
+                           month_label=start.strftime("%B %Y"), today=today(),
+                           emp_type=emp_type, q=q, status=status, counts=counts)
 
 
 TOTAL_KEYS = ("earned", "ot_amount", "da_amount", "bonus", "advance_deducted", "other_deductions", "net_paid")
@@ -83,9 +95,17 @@ def register():
     year, month = parse_month(request.args.get("month"))
     start, _, _ = month_bounds(year, month)
     payments = _month_payments(year, month)
+    emp_type, q, mode = request.args.get("type", ""), request.args.get("q", "").strip(), request.args.get("mode", "")
+    if emp_type in ("Driver", "Worker"):
+        payments = [p for p in payments if p.employee.emp_type == emp_type]
+    if q:
+        payments = [p for p in payments if q.lower() in p.employee.name.lower()]
+    if mode in ("Cash", "UPI", "Bank"):
+        payments = [p for p in payments if p.payment_mode == mode]
     totals = {k: sum((getattr(p, k) for p in payments), Decimal("0")) for k in TOTAL_KEYS}
     return render_template("salary/register.html", payments=payments, totals=totals,
-                           month_value=f"{year:04d}-{month:02d}", month_label=start.strftime("%B %Y"))
+                           month_value=f"{year:04d}-{month:02d}", month_label=start.strftime("%B %Y"),
+                           emp_type=emp_type, q=q, mode=mode)
 
 
 @bp.route("/register.xlsx")

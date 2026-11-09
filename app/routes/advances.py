@@ -30,19 +30,42 @@ def index():
             db.session.add(adv)
             db.session.commit()
             flash(f"Advance of ₹{amount} recorded for {emp.name}", "success")
-        return redirect(url_for("advances.index", month=request.args.get("month")))
+        return redirect(request.full_path if request.query_string else url_for("advances.index"))
 
-    year, month = parse_month(request.args.get("month"))
-    start, end, _ = month_bounds(year, month)
-    advances = Advance.query.filter(Advance.date.between(start, end)) \
-        .order_by(Advance.date.desc(), Advance.id.desc()).all()
+    from ..utils import parse_range
+    rng = parse_range(request.args, default="this_month")
+    emp_id = request.args.get("employee", type=int)
+    emp_type, q, mode = request.args.get("type", ""), request.args.get("q", "").strip(), request.args.get("mode", "")
+    aq = Advance.query.join(Employee).filter(Advance.date.between(rng["start"], rng["end"]))
+    if emp_id:
+        aq = aq.filter(Advance.employee_id == emp_id)
+    if emp_type in ("Driver", "Worker"):
+        aq = aq.filter(Employee.emp_type == emp_type)
+    if q:
+        aq = aq.filter(Employee.name.ilike(f"%{q}%") | Advance.reason.ilike(f"%{q}%"))
+    if mode in ("Cash", "UPI", "Bank"):
+        aq = aq.filter(Advance.mode == mode)
+    advances = aq.order_by(Advance.date.desc(), Advance.id.desc()).all()
     employees = Employee.query.filter_by(active=True).order_by(Employee.name).all()
-    outstanding = [(e, e.advance_outstanding()) for e in Employee.query.order_by(Employee.name).all()]
+    oq = Employee.query
+    if emp_id:
+        oq = oq.filter(Employee.id == emp_id)
+    if emp_type in ("Driver", "Worker"):
+        oq = oq.filter(Employee.emp_type == emp_type)
+    if q:
+        oq = oq.filter(Employee.name.ilike(f"%{q}%"))
+    outstanding = [(e, e.advance_outstanding()) for e in oq.order_by(Employee.name).all()]
     outstanding = [(e, o) for e, o in outstanding if o != 0]
+    by_emp = {}
+    for a in advances:
+        by_emp.setdefault(a.employee, [0, 0])
+        by_emp[a.employee][0] += 1
+        by_emp[a.employee][1] += a.amount
     return render_template("advances/index.html", advances=advances, employees=employees,
                            outstanding=outstanding, total=sum(a.amount for a in advances),
-                           month_value=f"{year:04d}-{month:02d}",
-                           month_label=start.strftime("%B %Y"), today=today())
+                           rng=rng, emp_id=emp_id, emp_type=emp_type, q=q, mode=mode,
+                           by_emp=sorted(by_emp.items(), key=lambda kv: -kv[1][1]),
+                           total_outstanding=sum(o for _, o in outstanding), today=today())
 
 
 @bp.route("/<int:adv_id>/delete", methods=["POST"])

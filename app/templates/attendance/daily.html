@@ -2,7 +2,10 @@
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
   <h1 class="text-xl sm:text-2xl font-bold text-blue-950">Attendance</h1>
-  <a href="{{ url_for('attendance.monthly') }}" class="text-sm text-blue-700 underline">Monthly view</a>
+  <div class="flex gap-3 text-sm">
+    <a href="{{ url_for('attendance.report') }}" class="text-blue-700 underline">Report (who worked)</a>
+    <a href="{{ url_for('attendance.monthly') }}" class="text-blue-700 underline">Monthly grid</a>
+  </div>
 </div>
 
 {% if current_user.is_owner %}
@@ -33,7 +36,6 @@
 <form method="post">
   <input type="hidden" name="date" value="{{ day.isoformat() }}">
   <div class="flex flex-wrap items-center gap-2 mb-3 text-sm">
-    <button type="button" onclick="markAll('P')" class="border border-emerald-300 text-emerald-700 bg-white rounded-lg px-3 py-1.5 font-semibold">✓ All present</button>
     <span class="text-slate-400 text-xs">P Present · H Half · A Absent · L Paid leave · <b class="text-orange-600">DA</b> day allowance</span>
   </div>
   <div class="space-y-3 sm:space-y-0 sm:bg-white sm:rounded-2xl sm:shadow-sm sm:border sm:border-slate-200 sm:divide-y">
@@ -80,7 +82,6 @@
   </div>
 </form>
 <script>
-function markAll(code) { document.querySelectorAll('input.att-' + code).forEach(r => r.checked = true); }
 </script>
 {% else %}
 <p class="text-slate-500">No active employees. <a class="text-blue-700 underline" href="{{ url_for('employees.new') }}">Add one</a>.</p>

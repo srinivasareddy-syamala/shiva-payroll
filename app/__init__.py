@@ -33,6 +33,8 @@ def create_app(config_class=Config):
     app.jinja_env.globals["local_today"] = today
     from .utils import can_change
     app.jinja_env.globals["can_change"] = can_change
+    from .utils import RANGE_PRESETS
+    app.jinja_env.globals["range_presets"] = RANGE_PRESETS
 
     @app.context_processor
     def inject_company():

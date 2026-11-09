@@ -3,7 +3,15 @@
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
   <h1 class="text-2xl font-bold">Salary register — {{ month_label }}</h1>
   <div class="flex items-center gap-2">
-    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border rounded-lg px-3 py-2"></form>
+    <form class="flex flex-wrap gap-2 text-sm">
+      <input type="month" name="month" value="{{ month_value }}" class="border border-slate-300 rounded-lg px-3 py-2">
+      <select name="type" class="border border-slate-300 rounded-lg px-2 py-2"><option value="">All types</option>
+        {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp_type == t }}>{{ t }}</option>{% endfor %}</select>
+      <select name="mode" class="border border-slate-300 rounded-lg px-2 py-2"><option value="">Any mode</option>
+        {% for m in ['Cash', 'UPI', 'Bank'] %}<option {{ 'selected' if mode == m }}>{{ m }}</option>{% endfor %}</select>
+      <input name="q" value="{{ q }}" placeholder="Name…" class="border border-slate-300 rounded-lg px-3 py-2 w-32">
+      <button class="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">Apply</button>
+    </form>
     <a href="{{ url_for('salary.register_excel', month=month_value) }}" class="bg-green-600 text-white rounded-lg px-3 py-2 text-sm">⬇ Excel</a>
     <button onclick="window.print()" class="border bg-white rounded-lg px-3 py-2 text-sm">Print</button>
   </div>

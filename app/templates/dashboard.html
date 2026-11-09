@@ -26,6 +26,22 @@
   {% endif %}
 </div>
 
+<h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">This week <span class="normal-case font-normal">({{ stats.week_start.strftime('%d %b') }} – today)</span></h2>
+<div class="grid grid-cols-3 gap-3 mb-8">
+  <a href="{{ url_for('attendance.report', range='this_week', show='worked') }}" class="bg-white rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-blue-600 p-3 hover:bg-blue-50">
+    <div class="text-[11px] uppercase text-slate-500">👷 Employees worked</div>
+    <div class="text-2xl font-bold">{{ stats.worked_week }} <span class="text-sm font-normal text-slate-400">/ {{ stats.active }}</span></div>
+  </a>
+  <a href="{{ url_for('attendance.report', range='this_week') }}" class="bg-white rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-orange-500 p-3 hover:bg-orange-50">
+    <div class="text-[11px] uppercase text-slate-500">🚚 DA given</div>
+    <div class="text-2xl font-bold">{{ stats.da_week|inr }}</div>
+  </a>
+  <a href="{{ url_for('advances.index', range='this_week') }}" class="bg-white rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-amber-500 p-3 hover:bg-amber-50">
+    <div class="text-[11px] uppercase text-slate-500">💵 Advances</div>
+    <div class="text-2xl font-bold">{{ stats.advances_week|inr }}</div>
+  </a>
+</div>
+
 {% if current_user.is_owner and pending_approvals %}
 <a href="{{ url_for('vehicles.approvals') }}" class="flex items-center justify-between mb-6 rounded-2xl px-5 py-4 bg-orange-50 border border-orange-200 text-orange-800 shadow-sm">
   <span>⏳ <b>{{ pending_approvals }}</b> vehicle expense{{ 's' if pending_approvals != 1 }} (diesel bills etc.) waiting for approval</span>

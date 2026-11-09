@@ -37,9 +37,13 @@ def index():
         q = q.filter_by(active=False)
     search = request.args.get("q", "").strip()
     if search:
-        q = q.filter(Employee.name.ilike(f"%{search}%"))
+        q = q.filter(Employee.name.ilike(f"%{search}%") | Employee.phone.ilike(f"%{search}%")
+                     | Employee.vehicle_no.ilike(f"%{search}%"))
+    emp_type = request.args.get("type", "")
+    if emp_type in ("Driver", "Worker"):
+        q = q.filter_by(emp_type=emp_type)
     emps = q.order_by(Employee.emp_type, Employee.name).all()
-    return render_template("employees/index.html", employees=emps, show=show, search=search)
+    return render_template("employees/index.html", employees=emps, show=show, search=search, emp_type=emp_type)
 
 
 @bp.route("/new", methods=["GET", "POST"])

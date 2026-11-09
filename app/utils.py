@@ -139,3 +139,44 @@ def save_upload(file_storage, prefix="slip"):
         fname = name + ext
         file_storage.save(os.path.join(folder, fname))
         return fname
+
+
+RANGE_PRESETS = [("today", "Today"), ("this_week", "This week"), ("last_week", "Last week"),
+                 ("this_month", "This month"), ("last_month", "Last month"), ("custom", "Custom")]
+
+
+def parse_range(args, default="this_week"):
+    """Date range from ?range=...&from=YYYY-MM-DD&to=YYYY-MM-DD. Weeks run Monday–Sunday.
+    Returns dict(start, end, key, label)."""
+    from datetime import timedelta
+    t = today()
+    key = args.get("range") or default
+    start = end = t
+    if key == "today":
+        pass
+    elif key == "this_week":
+        start, end = t - timedelta(days=t.weekday()), t
+    elif key == "last_week":
+        end = t - timedelta(days=t.weekday() + 1)
+        start = end - timedelta(days=6)
+    elif key == "this_month":
+        start, end = t.replace(day=1), t
+    elif key == "last_month":
+        end = t.replace(day=1) - timedelta(days=1)
+        start = end.replace(day=1)
+    else:
+        key = "custom"
+        try:
+            start = datetime.strptime(args.get("from", ""), "%Y-%m-%d").date()
+        except ValueError:
+            start = t - timedelta(days=t.weekday())
+        try:
+            end = datetime.strptime(args.get("to", ""), "%Y-%m-%d").date()
+        except ValueError:
+            end = t
+        if end < start:
+            start, end = end, start
+        if (end - start).days > 400:
+            start = end - timedelta(days=400)
+    label = start.strftime("%d %b %Y") if start == end else f"{start:%d %b} – {end:%d %b %Y}"
+    return {"start": start, "end": end, "key": key, "label": label}

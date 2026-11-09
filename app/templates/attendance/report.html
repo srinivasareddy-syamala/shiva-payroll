@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_range_filter.html" import range_filter %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+  <h1 class="text-xl sm:text-2xl font-bold text-blue-950">Attendance report</h1>
+  <div class="flex gap-2 text-sm">
+    <a href="{{ url_for('attendance.daily') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2">Daily</a>
+    <a href="{{ url_for('attendance.monthly') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2">Monthly grid</a>
+    <a href="{{ url_for('attendance.report_excel', **request.args) }}" class="bg-emerald-600 text-white rounded-lg px-3 py-2">⬇ Excel</a>
+  </div>
+</div>
+
+{% set extra %}
+  <select name="type" class="border border-slate-300 rounded-lg px-2 py-2 text-sm">
+    <option value="">All types</option>
+    {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp_type == t }}>{{ t }}</option>{% endfor %}
+  </select>
+  <select name="show" class="border border-slate-300 rounded-lg px-2 py-2 text-sm">
+    <option value="all" {{ 'selected' if show == 'all' }}>Everyone</option>
+    <option value="worked" {{ 'selected' if show == 'worked' }}>Worked</option>
+    <option value="not_worked" {{ 'selected' if show == 'not_worked' }}>Did not work</option>
+  </select>
+  <input name="q" value="{{ q }}" placeholder="Search name…" class="col-span-2 md:col-span-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+{% endset %}
+{{ range_filter(rng, extra) }}
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+  <div class="bg-blue-900 text-white rounded-2xl p-3">
+    <div class="text-[11px] uppercase text-blue-200">Employees worked</div>
+    <div class="text-2xl font-bold">{{ summary.worked }} <span class="text-sm font-normal text-blue-200">/ {{ summary.employees }}</span></div>
+    <div class="text-xs text-blue-200">{{ summary.drivers_worked }} drivers · {{ summary.workers_worked }} workers</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-3">
+    <div class="text-[11px] uppercase text-slate-500">Total paid days</div>
+    <div class="text-2xl font-bold">{{ summary.paid_days|days }}</div>
+    <div class="text-xs text-slate-400">{{ days }} day{{ 's' if days != 1 }} in range</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-orange-500 p-3">
+    <div class="text-[11px] uppercase text-slate-500">DA given</div>
+    <div class="text-2xl font-bold">{{ summary.da|inr }}</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-indigo-500 p-3">
+    <div class="text-[11px] uppercase text-slate-500">Overtime</div>
+    <div class="text-2xl font-bold">{{ summary.ot|days }} h</div>
+  </div>
+</div>
+
+<!-- phone cards -->
+<div class="md:hidden space-y-2">
+  {% for r in rows %}
+  <a href="{{ url_for('employees.ledger', emp_id=r.emp.id) }}" class="block bg-white rounded-2xl border border-slate-200 p-3 {{ '' if r.worked else 'opacity-70' }}">
+    <div class="flex justify-between">
+      <span class="font-semibold">{{ r.emp.name }} <span class="text-xs text-slate-400">{{ r.emp.emp_type }}</span></span>
+      <span class="font-bold text-blue-800">{{ r.paid|days }} days</span>
+    </div>
+    <div class="text-xs text-slate-500 mt-1">P {{ r.P }} · H {{ r.H }} · A {{ r.A }} · L {{ r.L }}{% if r.unmarked %} · <span class="text-amber-600">{{ r.unmarked }} not marked</span>{% endif %}{% if r.ot %} · OT {{ r.ot|days }}h{% endif %}{% if r.da %} · <span class="text-orange-600">DA {{ r.da|inr }}</span>{% endif %}</div>
+  </a>
+  {% else %}<div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400">No employees match.</div>{% endfor %}
+</div>
+
+<!-- desktop table -->
+<div class="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-blue-900 text-blue-50">
+      <tr class="text-right"><th class="px-3 py-3 text-left">Employee</th><th class="px-3 py-3">Present</th><th class="px-3 py-3">Half</th>
+        <th class="px-3 py-3">Absent</th><th class="px-3 py-3">Leave</th><th class="px-3 py-3">Paid days</th><th class="px-3 py-3">Not marked</th>
+        <th class="px-3 py-3">OT hrs</th><th class="px-3 py-3">DA</th></tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for r in rows %}
+      <tr class="text-right {{ '' if r.worked else 'text-slate-400' }}">
+        <td class="px-3 py-2 text-left"><a href="{{ url_for('employees.ledger', emp_id=r.emp.id) }}" class="font-medium text-blue-700">{{ r.emp.name }}</a>
+          <span class="text-xs text-slate-400">{{ r.emp.emp_type }}</span></td>
+        <td class="px-3 py-2">{{ r.P }}</td><td class="px-3 py-2">{{ r.H }}</td><td class="px-3 py-2">{{ r.A }}</td><td class="px-3 py-2">{{ r.L }}</td>
+        <td class="px-3 py-2 font-bold text-slate-800">{{ r.paid|days }}</td>
+        <td class="px-3 py-2 {{ 'text-amber-600' if r.unmarked }}">{{ r.unmarked or '' }}</td>
+        <td class="px-3 py-2">{{ r.ot|days if r.ot else '' }}</td>
+        <td class="px-3 py-2 text-orange-700">{{ r.da|inr if r.da else '' }}</td>
+      </tr>
+      {% else %}<tr><td colspan="9" class="px-4 py-8 text-center text-slate-400">No employees match.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

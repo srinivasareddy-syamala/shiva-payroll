@@ -63,7 +63,13 @@ def daily():
 def monthly():
     year, month = parse_month(request.args.get("month"))
     start, end, days = month_bounds(year, month)
-    employees = Employee.query.filter_by(active=True).order_by(Employee.emp_type, Employee.name).all()
+    emp_type, q = request.args.get("type", ""), request.args.get("q", "").strip()
+    eq = Employee.query.filter_by(active=True)
+    if emp_type in ("Driver", "Worker"):
+        eq = eq.filter_by(emp_type=emp_type)
+    if q:
+        eq = eq.filter(Employee.name.ilike(f"%{q}%"))
+    employees = eq.order_by(Employee.emp_type, Employee.name).all()
     grid, da_days, da_total = {}, set(), {}
     for a in Attendance.query.filter(Attendance.date.between(start, end)).all():
         grid[(a.employee_id, a.date.day)] = a.status
@@ -78,4 +84,88 @@ def monthly():
     return render_template("attendance/monthly.html", employees=employees, grid=grid,
                            days=range(1, days + 1), totals=totals, da_days=da_days, da_total=da_total, year=year, month=month,
                            month_value=f"{year:04d}-{month:02d}",
-                           month_label=start.strftime("%B %Y"))
+                           month_label=start.strftime("%B %Y"), emp_type=emp_type, q=q)
+
+
+def _report_rows(rng, emp_type, q):
+    from decimal import Decimal
+    from sqlalchemy import func
+    emps = Employee.query.filter_by(active=True)
+    if emp_type in ("Driver", "Worker"):
+        emps = emps.filter_by(emp_type=emp_type)
+    if q:
+        emps = emps.filter(Employee.name.ilike(f"%{q}%"))
+    emps = emps.order_by(Employee.emp_type, Employee.name).all()
+    ids = [e.id for e in emps]
+    stats = {}
+    if ids:
+        rows = db.session.query(Attendance.employee_id, Attendance.status, func.count(),
+                                func.coalesce(func.sum(Attendance.ot_hours), 0),
+                                func.coalesce(func.sum(Attendance.da_amount), 0)) \
+            .filter(Attendance.employee_id.in_(ids), Attendance.date.between(rng["start"], rng["end"])) \
+            .group_by(Attendance.employee_id, Attendance.status).all()
+        for eid, status, cnt, ot, da in rows:
+            s = stats.setdefault(eid, {"P": 0, "H": 0, "A": 0, "L": 0, "ot": Decimal(0), "da": Decimal(0)})
+            s[status] = cnt
+            s["ot"] += Decimal(ot)
+            s["da"] += Decimal(da)
+    days = (min(rng["end"], today()) - rng["start"]).days + 1
+    out = []
+    for e in emps:
+        s = stats.get(e.id, {"P": 0, "H": 0, "A": 0, "L": 0, "ot": Decimal(0), "da": Decimal(0)})
+        paid = sum(Decimal(s[k]) * ATTENDANCE_STATUSES[k][1] for k in ATTENDANCE_STATUSES)
+        marked = s["P"] + s["H"] + s["A"] + s["L"]
+        out.append({"emp": e, **s, "paid": paid, "worked": s["P"] + s["H"] > 0,
+                    "unmarked": max(days - marked, 0)})
+    return out, max(days, 0)
+
+
+@bp.route("/report")
+@login_required
+def report():
+    from ..utils import parse_range
+    rng = parse_range(request.args)
+    emp_type, q = request.args.get("type", ""), request.args.get("q", "").strip()
+    rows, days = _report_rows(rng, emp_type, q)
+    show = request.args.get("show", "all")
+    if show == "worked":
+        rows = [r for r in rows if r["worked"]]
+    elif show == "not_worked":
+        rows = [r for r in rows if not r["worked"]]
+    allrows, _ = _report_rows(rng, emp_type, q)
+    summary = {
+        "employees": len(allrows),
+        "worked": sum(1 for r in allrows if r["worked"]),
+        "drivers_worked": sum(1 for r in allrows if r["worked"] and r["emp"].emp_type == "Driver"),
+        "workers_worked": sum(1 for r in allrows if r["worked"] and r["emp"].emp_type == "Worker"),
+        "paid_days": sum(r["paid"] for r in allrows),
+        "da": sum(r["da"] for r in allrows),
+        "ot": sum(r["ot"] for r in allrows),
+    }
+    return render_template("attendance/report.html", rows=rows, rng=rng, days=days, summary=summary,
+                           emp_type=emp_type, q=q, show=show)
+
+
+@bp.route("/report.xlsx")
+@login_required
+def report_excel():
+    from io import BytesIO
+    from flask import send_file
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from ..utils import parse_range
+    rng = parse_range(request.args)
+    rows, days = _report_rows(rng, request.args.get("type", ""), request.args.get("q", "").strip())
+    wb = Workbook(); ws = wb.active; ws.title = "Attendance"
+    ws.append([f"Attendance {rng['label']}"]); ws["A1"].font = Font(bold=True, size=13)
+    ws.append(["Name", "Type", "Present", "Half day", "Absent", "Paid leave", "Paid days", "Not marked", "OT hrs", "DA"])
+    for c in ws[2]:
+        c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="1E3A8A")
+    for r in rows:
+        ws.append([r["emp"].name, r["emp"].emp_type, r["P"], r["H"], r["A"], r["L"], float(r["paid"]),
+                   r["unmarked"], float(r["ot"]), float(r["da"])])
+    for col, w in zip("ABCDEFGHIJ", [24, 9, 9, 9, 9, 10, 10, 11, 8, 10]):
+        ws.column_dimensions[col].width = w
+    buf = BytesIO(); wb.save(buf); buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name=f"attendance_{rng['start']}_{rng['end']}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

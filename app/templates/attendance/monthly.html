@@ -2,7 +2,14 @@
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
   <h1 class="text-2xl font-bold">Attendance — {{ month_label }}</h1>
-  <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border rounded-lg px-3 py-2"></form>
+  <form class="flex flex-wrap gap-2 text-sm">
+    <input type="month" name="month" value="{{ month_value }}" class="border border-slate-300 rounded-lg px-3 py-2">
+    <select name="type" class="border border-slate-300 rounded-lg px-2 py-2"><option value="">All types</option>
+      {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp_type == t }}>{{ t }}</option>{% endfor %}</select>
+    <input name="q" value="{{ q }}" placeholder="Name…" class="border border-slate-300 rounded-lg px-3 py-2 w-32">
+    <button class="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">Apply</button>
+    <a href="{{ url_for('attendance.report') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2">Report</a>
+  </form>
 </div>
 {% set colors = {'P': 'bg-green-500 text-white', 'H': 'bg-amber-400 text-white', 'A': 'bg-red-500 text-white', 'L': 'bg-blue-500 text-white'} %}
 <p class="text-xs text-slate-500 mb-2"><span class="inline-block w-2.5 h-2.5 rounded-full bg-orange-500 align-middle"></span> = DA given that day. Click a name to edit or delete days.</p>
