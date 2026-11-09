@@ -6,14 +6,14 @@
 {{ link('main.dashboard', 'Dashboard') }}
 {{ link('attendance.daily', 'Attendance') }}
 {{ link('vehicles.index', 'Vehicles') }}
+{{ link('employees.index', 'Employees') }}
+{{ link('advances.index', 'Advances') }}
+{{ link('salary.run', 'Salary') }}
 {% if current_user.is_owner %}
   <a href="{{ url_for('vehicles.approvals') }}"
      class="px-2 py-2 rounded-lg {{ 'bg-white/20 font-semibold' if ep == 'vehicles.approvals' else 'hover:bg-white/10' }}">Approvals{% if pending_approvals %}
      <span class="ml-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-500 text-white text-xs font-bold">{{ pending_approvals }}</span>{% endif %}</a>
-  {{ link('employees.index', 'Employees') }}
-  {{ link('advances.index', 'Advances') }}
-  {{ link('salary.run', 'Salary') }}
-  <a href="{{ url_for('settings.index') }}"
+  {% endif %}
+<a href="{{ url_for('settings.index') }}"
      class="px-2 py-2 rounded-lg {{ 'bg-white/20 font-semibold' if ep in ('settings.index', 'auth.users') else 'hover:bg-white/10' }}">Settings</a>
-{% endif %}
 <a href="{{ url_for('auth.logout') }}" class="px-2 py-2 rounded-lg hover:bg-white/10 text-blue-200">Logout <span class="text-xs">({{ current_user.username }})</span></a>

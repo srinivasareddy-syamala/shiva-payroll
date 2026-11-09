@@ -1,18 +1,17 @@
 from datetime import date, datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from .. import db
 from ..models import Advance, Employee
-from ..utils import month_bounds, owner_required, parse_month, to_dec, today
+from ..utils import can_change, month_bounds, parse_month, to_dec, today
 
 bp = Blueprint("advances", __name__, url_prefix="/advances")
 
 
 @bp.route("/", methods=["GET", "POST"])
 @login_required
-@owner_required
 def index():
     if request.method == "POST":
         emp = db.session.get(Employee, request.form.get("employee_id", type=int))
@@ -20,7 +19,7 @@ def index():
         if not emp or amount <= 0:
             flash("Choose an employee and enter an amount greater than 0", "error")
         else:
-            d = request.form.get("date")
+            d = request.form.get("date") if current_user.is_owner else None
             adv = Advance(
                 employee_id=emp.id,
                 amount=amount,
@@ -48,9 +47,11 @@ def index():
 
 @bp.route("/<int:adv_id>/delete", methods=["POST"])
 @login_required
-@owner_required
 def delete(adv_id):
     adv = db.get_or_404(Advance, adv_id)
+    if not can_change(adv.date):
+        flash("Supervisors can delete only today's advances", "error")
+        return redirect(request.referrer or url_for("advances.index"))
     db.session.delete(adv)
     db.session.commit()
     flash("Advance entry deleted", "success")
@@ -59,9 +60,11 @@ def delete(adv_id):
 
 @bp.route("/<int:adv_id>/edit", methods=["GET", "POST"])
 @login_required
-@owner_required
 def edit(adv_id):
     adv = db.get_or_404(Advance, adv_id)
+    if not can_change(adv.date):
+        flash("Supervisors can change only today's advances", "error")
+        return redirect(request.args.get("next") or url_for("employees.ledger", emp_id=adv.employee_id))
     if request.method == "POST":
         amount = to_dec(request.form.get("amount"))
         if amount <= 0:
@@ -69,7 +72,7 @@ def edit(adv_id):
         else:
             adv.amount = amount
             d = request.form.get("date")
-            if d:
+            if d and current_user.is_owner:
                 adv.date = datetime.strptime(d, "%Y-%m-%d").date()
             adv.mode = request.form.get("mode", adv.mode)
             adv.reason = request.form.get("reason", "").strip() or None

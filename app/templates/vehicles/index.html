@@ -3,14 +3,14 @@
 <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
   <div>
     <h1 class="text-2xl font-bold text-blue-950">Vehicles</h1>
-    {% if current_user.is_owner %}<p class="text-sm text-slate-500">Approved expenses for {{ month_label }}</p>{% endif %}
+    {% if true %}<p class="text-sm text-slate-500">Approved expenses for {{ month_label }}</p>{% endif %}
   </div>
   <div class="flex flex-wrap gap-2">
-    {% if current_user.is_owner %}
+    {% if true %}
     <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></form>
     <a href="{{ url_for('vehicles.new') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">+ Add vehicle</a>
     {% endif %}
-    <a href="{{ url_for('vehicles.expenses') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">{{ 'All expenses' if current_user.is_owner else 'My entries' }}</a>
+    <a href="{{ url_for('vehicles.expenses') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">All expenses</a>
   </div>
 </div>
 
@@ -32,7 +32,7 @@
 </a>
 {% endif %}
 
-{% if current_user.is_owner %}
+{% if true %}
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
   {% for cat, icon in categories.items() %}
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3">
@@ -52,7 +52,7 @@
     <thead class="bg-blue-900 text-blue-50 text-left">
       <tr>
         <th class="px-4 py-3">Vehicle</th><th class="px-4 py-3">Driver</th>
-        {% if current_user.is_owner %}
+        {% if true %}
         <th class="px-4 py-3 text-right">Diesel</th><th class="px-4 py-3 text-right">Litres</th>
         <th class="px-4 py-3 text-right">Repair</th><th class="px-4 py-3 text-right">Loading</th>
         <th class="px-4 py-3 text-right">Other</th><th class="px-4 py-3 text-right">Total</th>
@@ -64,12 +64,11 @@
       {% set t = totals.get(v.id, {}) %}
       <tr class="{{ 'opacity-50' if not v.active }}">
         <td class="px-4 py-3">
-          {% if current_user.is_owner %}<a href="{{ url_for('vehicles.detail', vid=v.id, month=month_value) }}" class="font-semibold text-blue-700">{{ v.number }}</a>
-          {% else %}<span class="font-semibold">{{ v.number }}</span>{% endif %}
+          <a href="{{ url_for('vehicles.detail', vid=v.id, month=month_value) }}" class="font-semibold text-blue-700">{{ v.number }}</a>
           <div class="text-xs text-slate-400">{{ v.vehicle_type }}{% if v.model %} · {{ v.model }}{% endif %}{% if not v.active %} · inactive{% endif %}</div>
         </td>
         <td class="px-4 py-3">{{ v.driver.name if v.driver else '—' }}</td>
-        {% if current_user.is_owner %}
+        {% if true %}
         <td class="px-4 py-3 text-right">{{ t.get('Diesel', 0)|inr }}</td>
         <td class="px-4 py-3 text-right text-slate-500">{{ t.get('litres', 0)|days }}</td>
         <td class="px-4 py-3 text-right">{{ t.get('Repair', 0)|inr }}</td>
@@ -80,7 +79,7 @@
       </tr>
       {% else %}
       <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No vehicles yet.
-        {% if current_user.is_owner %}<a href="{{ url_for('vehicles.new') }}" class="text-blue-700 underline">Add the first vehicle</a>{% endif %}</td></tr>
+        {% if true %}<a href="{{ url_for('vehicles.new') }}" class="text-blue-700 underline">Add the first vehicle</a>{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>

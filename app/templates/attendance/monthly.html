@@ -19,7 +19,7 @@
     <tbody class="divide-y">
       {% for e in employees %}
       <tr>
-        <td class="px-3 py-1 font-medium whitespace-nowrap sticky left-0 bg-white">{% if current_user.is_owner %}<a class="text-blue-700" href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}">{{ e.name }}</a>{% else %}{{ e.name }}{% endif %}</td>
+        <td class="px-3 py-1 font-medium whitespace-nowrap sticky left-0 bg-white"><a class="text-blue-700" href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}">{{ e.name }}</a></td>
         {% for d in days %}
           {% set s = grid.get((e.id, d)) %}
           <td class="px-0.5 py-1 text-center">

@@ -4,6 +4,7 @@
 {% include "_settings_tabs.html" %}
 {% set inp = "w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" %}
 <div class="grid md:grid-cols-2 gap-6">
+  {% if current_user.is_owner %}
   <form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
     <input type="hidden" name="form" value="company">
     <h2 class="font-semibold text-blue-900">Company details <span class="text-xs font-normal text-slate-500">(shown on salary slips &amp; WhatsApp)</span></h2>
@@ -17,6 +18,7 @@
       <input name="slip_note" value="{{ st.slip_note }}" placeholder="e.g. Thank you for your hard work" class="{{ inp }}"></div>
     <button class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-5 py-2 font-semibold">Save</button>
   </form>
+  {% endif %}
 
   <form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4 h-fit">
     <input type="hidden" name="form" value="password">

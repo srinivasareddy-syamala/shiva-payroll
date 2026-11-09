@@ -31,6 +31,8 @@ def create_app(config_class=Config):
     app.jinja_env.filters["days"] = days
     app.jinja_env.filters["localtime"] = localtime
     app.jinja_env.globals["local_today"] = today
+    from .utils import can_change
+    app.jinja_env.globals["can_change"] = can_change
 
     @app.context_processor
     def inject_company():

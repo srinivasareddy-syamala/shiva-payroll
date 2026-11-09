@@ -33,8 +33,9 @@
         <td class="px-3 py-2 whitespace-nowrap">
           <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="text-blue-700 text-xs">Slip</a>
           <a href="{{ url_for('salary.share', payment_id=p.id) }}" class="text-emerald-600 text-xs font-semibold ml-2">WhatsApp</a>
+          {% if can_change(p.paid_on) %}
           <form method="post" action="{{ url_for('salary.delete', payment_id=p.id) }}" class="inline" onsubmit="return confirm('Remove this salary entry?')">
-            <button class="text-red-500 text-xs ml-2">Remove</button></form>
+            <button class="text-red-500 text-xs ml-2">Remove</button></form>{% endif %}
         </td>
       </tr>
       {% else %}

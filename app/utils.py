@@ -33,6 +33,15 @@ def localtime(dt, fmt="%d %b, %I:%M %p"):
     return dt.replace(tzinfo=timezone.utc).astimezone(_tz()).strftime(fmt).replace(" 0", " ").lstrip("0")
 
 
+def can_change(d):
+    """Owners can change any date; supervisors only today's entries (India time)."""
+    if current_user.is_authenticated and current_user.is_owner:
+        return True
+    if isinstance(d, datetime):
+        d = d.date()
+    return d == today()
+
+
 def owner_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):

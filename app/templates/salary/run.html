@@ -34,8 +34,9 @@
       <tbody class="divide-y">
         {% for e, c in rows %}
         {% set p = c.existing %}
+        {% set locked = p and not can_change(p.paid_on) %}
         <tr class="{{ 'bg-amber-50' if c.stale else ('bg-emerald-50' if p) }}" data-row data-gross="{{ c.gross }}">
-          <td class="px-3 py-2"><input type="checkbox" name="pay" value="{{ e.id }}" class="paychk" {{ 'checked' if not p or c.stale }}></td>
+          <td class="px-3 py-2">{% if locked %}<span title="Saved on an earlier day – owner only">🔒</span>{% else %}<input type="checkbox" name="pay" value="{{ e.id }}" class="paychk" {{ 'checked' if not p or c.stale }}>{% endif %}</td>
           <td class="px-3 py-2">
             <a href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}" class="font-medium text-blue-700">{{ e.name }}</a>
             <div class="text-xs text-slate-400">{{ e.rate|inr }}/{{ 'mo' if e.pay_type == 'Monthly' else 'day' }}
@@ -75,7 +76,11 @@
     </table>
   </div>
   <div class="flex flex-wrap items-center gap-3 mt-4">
+    {% if current_user.is_owner %}
     <label class="text-sm">Paid on <input type="date" name="paid_on" value="{{ today.isoformat() }}" class="border rounded-lg px-3 py-2 ml-1"></label>
+    {% else %}
+    <span class="text-sm">Paid on <b>{{ today.strftime('%d %b %Y') }}</b> (today)</span>
+    {% endif %}
     <button class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-2 font-semibold">Save salary for ticked</button>
     <span class="text-xs text-slate-500">Saving a paid row again updates it.</span>
   </div>
@@ -86,6 +91,7 @@ const fmt = n => '₹' + n.toLocaleString('en-IN', Number.isInteger(Math.round(n
 function recalc() {
   let grand = 0;
   document.querySelectorAll('tr[data-row]').forEach(tr => {
+    if (!tr.querySelector('.paychk')) { tr.querySelector('.net').textContent = fmt(parseFloat(tr.dataset.gross) + (parseFloat(tr.querySelector('[data-k=bonus]').value)||0) - (parseFloat(tr.querySelector('[data-k=adv]').value)||0) - (parseFloat(tr.querySelector('[data-k=other]').value)||0)); return; }
     const v = k => parseFloat(tr.querySelector(`[data-k=${k}]`).value) || 0;
     const net = parseFloat(tr.dataset.gross) + v('bonus') - v('adv') - v('other');
     tr.querySelector('.net').textContent = fmt(net);

@@ -57,7 +57,7 @@
     <a href="{{ url_for('employees.index') }}" class="px-5 py-2 text-slate-500">Cancel</a>
   </div>
 </form>
-{% if emp.id %}
+{% if emp.id and current_user.is_owner %}
 <form method="post" action="{{ url_for('employees.delete', emp_id=emp.id) }}" class="mt-4"
       onsubmit="return confirm('Delete {{ emp.name }}? Their attendance will be deleted too. If they have salary or advance records they will be marked inactive instead.')">
   <button class="text-sm text-red-600 border border-red-300 rounded-lg px-4 py-2 hover:bg-red-50">Delete employee</button>

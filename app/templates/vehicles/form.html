@@ -24,7 +24,7 @@
     <a href="{{ url_for('vehicles.index') }}" class="px-5 py-2 text-slate-500">Cancel</a>
   </div>
 </form>
-{% if v.id %}
+{% if v.id and current_user.is_owner %}
 <form method="post" action="{{ url_for('vehicles.delete', vid=v.id) }}" onsubmit="return confirm('Delete vehicle {{ v.number }}?')" class="mt-4">
   <button class="text-sm text-red-600 border border-red-300 rounded-lg px-4 py-2 hover:bg-red-50">Delete vehicle</button>
 </form>

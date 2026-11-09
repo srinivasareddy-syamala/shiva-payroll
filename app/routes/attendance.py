@@ -60,7 +60,6 @@ def daily():
 
 @bp.route("/month")
 @login_required
-@owner_required
 def monthly():
     year, month = parse_month(request.args.get("month"))
     start, end, days = month_bounds(year, month)

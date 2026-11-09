@@ -49,8 +49,10 @@
       {{ badge(e.status) }}
       {% if e.slip_file %}<a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700 text-xs">📎 Slip</a>{% endif %}
       <b>{{ e.amount|inr }}</b>
-      <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.full_path) }}" class="text-blue-700 text-xs">Edit</a>
-      <form method="post" action="{{ url_for('vehicles.expense_delete', eid=e.id) }}" onsubmit="return confirm('Delete this expense?')"><button class="text-red-500 text-xs">Delete</button></form>
+      {% if current_user.is_owner or (e.status != 'Approved' and e.date == local_today()) %}
+      <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.full_path) }}" class="text-blue-700 text-xs">Edit</a>{% endif %}
+      {% if current_user.is_owner or (e.status == 'Pending' and e.date == local_today()) %}
+      <form method="post" action="{{ url_for('vehicles.expense_delete', eid=e.id) }}" onsubmit="return confirm('Delete this expense?')"><button class="text-red-500 text-xs">Delete</button></form>{% endif %}
     </div>
   </div>
   {% else %}

@@ -23,7 +23,7 @@ def dashboard():
                                             Attendance.status.in_(["P", "H"])).count()
     stats = {"active": active, "marked_today": marked_today, "present_today": present_today}
 
-    if current_user.is_owner:
+    if True:
         stats["advances_month"] = db.session.query(func.coalesce(func.sum(Advance.amount), 0)) \
             .filter(Advance.date.between(start, end)).scalar()
         stats["salary_month"] = db.session.query(func.coalesce(func.sum(SalaryPayment.net_paid), 0)) \

@@ -10,10 +10,9 @@ bp = Blueprint("settings", __name__, url_prefix="/settings")
 
 @bp.route("/", methods=["GET", "POST"])
 @login_required
-@owner_required
 def index():
     if request.method == "POST":
-        if request.form.get("form") == "company":
+        if request.form.get("form") == "company" and current_user.is_owner:
             for key in ("company_name", "company_address", "company_phone", "slip_note"):
                 Setting.set(key, request.form.get(key, "").strip())
             db.session.commit()

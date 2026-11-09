@@ -42,7 +42,7 @@ def index():
     year, month, start, end, month_value, month_label = _month_ctx()
     vehicles = Vehicle.query.order_by(Vehicle.active.desc(), Vehicle.number).all()
     totals = {}
-    if current_user.is_owner:
+    if True:
         rows = db.session.query(VehicleExpense.vehicle_id, VehicleExpense.category,
                                 func.sum(VehicleExpense.amount), func.coalesce(func.sum(VehicleExpense.litres), 0)) \
             .filter(VehicleExpense.status == "Approved", VehicleExpense.date.between(start, end)) \
@@ -72,7 +72,6 @@ def _fill_vehicle(v, f):
 
 @bp.route("/new", methods=["GET", "POST"])
 @login_required
-@owner_required
 def new():
     v = Vehicle(active=True)
     if request.method == "POST":
@@ -91,7 +90,6 @@ def new():
 
 @bp.route("/<int:vid>/edit", methods=["GET", "POST"])
 @login_required
-@owner_required
 def edit(vid):
     v = db.get_or_404(Vehicle, vid)
     if request.method == "POST":
@@ -128,7 +126,6 @@ def _drivers():
 
 @bp.route("/<int:vid>")
 @login_required
-@owner_required
 def detail(vid):
     v = db.get_or_404(Vehicle, vid)
     year, month, start, end, month_value, month_label = _month_ctx()
@@ -167,7 +164,12 @@ def _remove_file(name):
 
 
 def _can_edit(e):
-    return current_user.is_owner or (e.submitted_by == current_user.id and e.status != "Approved")
+    """Owner: anything. Supervisor: today's entries that are not yet approved."""
+    return current_user.is_owner or (e.status != "Approved" and e.date == today())
+
+
+def _can_delete(e):
+    return current_user.is_owner or (e.status == "Pending" and e.date == today())
 
 
 def _fill_expense(e, f, files):
@@ -275,7 +277,7 @@ def expense_edit(eid):
 @login_required
 def expense_delete(eid):
     e = db.get_or_404(VehicleExpense, eid)
-    if not (current_user.is_owner or (e.submitted_by == current_user.id and e.status == "Pending")):
+    if not _can_delete(e):
         abort(403)
     _remove_file(e.slip_file)
     db.session.delete(e)
@@ -294,8 +296,6 @@ def _expense_query():
         q = q.filter_by(category=cat)
     if status in ("Pending", "Approved", "Rejected"):
         q = q.filter_by(status=status)
-    if not current_user.is_owner:
-        q = q.filter_by(submitted_by=current_user.id)
     return q.order_by(VehicleExpense.date.desc(), VehicleExpense.id.desc()), month_value, month_label
 
 
@@ -312,7 +312,6 @@ def expenses():
 
 @bp.route("/expenses.xlsx")
 @login_required
-@owner_required
 def expenses_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -382,6 +381,6 @@ def approvals():
 @login_required
 def slip(eid):
     e = db.get_or_404(VehicleExpense, eid)
-    if not (current_user.is_owner or e.submitted_by == current_user.id) or not e.slip_file:
+    if not e.slip_file:
         abort(404)
     return send_from_directory(current_app.config["UPLOAD_FOLDER"], e.slip_file)

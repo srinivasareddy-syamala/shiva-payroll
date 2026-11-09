@@ -43,6 +43,7 @@
     <span class="w-28">Date</span><span class="w-40">Status</span><span class="w-20">OT hrs</span><span class="w-24">DA ₹</span><span class="flex-1">Remarks</span><span class="w-36"></span>
   </div>
   {% for d, rec in day_rows|reverse %}
+  {% set editable = can_change(d) %}
   <form method="post" action="{{ url_for('employees.day_update', emp_id=emp.id, day=d.isoformat()) }}" id="d{{ d.isoformat() }}"
         class="flex flex-wrap md:flex-nowrap items-center gap-3 px-4 py-2 {{ 'bg-orange-50/60' if rec and rec.da_amount > 0 else '' }} {{ 'bg-slate-50' if d.weekday() == 6 and not rec else '' }}">
     <span class="w-28 text-sm"><b>{{ d.strftime('%d %b') }}</b> <span class="text-slate-400 text-xs">{{ d.strftime('%a') }}</span>
@@ -50,19 +51,20 @@
     <span class="w-40 flex gap-1">
       {% for code in statuses %}
       <label class="cursor-pointer">
-        <input type="radio" name="status" value="{{ code }}" class="att att-{{ code }} sr-only" {{ 'checked' if rec and rec.status == code }}>
+        <input type="radio" name="status" value="{{ code }}" class="att att-{{ code }} sr-only" {{ 'checked' if rec and rec.status == code }} {{ 'disabled' if not editable }}>
         <span class="inline-flex w-8 h-8 items-center justify-center rounded-lg border-2 border-slate-200 text-sm font-bold select-none">{{ code }}</span>
       </label>
       {% endfor %}
     </span>
-    <input name="ot" value="{{ rec.ot_hours|days if rec and rec.ot_hours else '' }}" placeholder="OT" inputmode="decimal" class="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
-    <input name="da" value="{{ rec.da_amount|days if rec and rec.da_amount else '' }}" placeholder="DA" inputmode="decimal" class="w-24 border border-orange-300 rounded-lg px-2 py-1.5 text-sm">
-    <input name="remarks" value="{{ rec.remarks if rec and rec.remarks else '' }}" placeholder="{{ 'Remarks' if rec else 'Not marked' }}" class="flex-1 min-w-[120px] border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+    <input name="ot" {{ 'disabled' if not editable }} value="{{ rec.ot_hours|days if rec and rec.ot_hours else '' }}" placeholder="OT" inputmode="decimal" class="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+    <input name="da" {{ 'disabled' if not editable }} value="{{ rec.da_amount|days if rec and rec.da_amount else '' }}" placeholder="DA" inputmode="decimal" class="w-24 border border-orange-300 rounded-lg px-2 py-1.5 text-sm">
+    <input name="remarks" {{ 'disabled' if not editable }} value="{{ rec.remarks if rec and rec.remarks else '' }}" placeholder="{{ 'Remarks' if rec else 'Not marked' }}" class="flex-1 min-w-[120px] border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
     <span class="w-36 flex gap-2 justify-end">
+      {% if not editable %}<span class="text-[11px] text-slate-400">🔒 view only</span>{% else %}
       <button name="action" value="save" class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-3 py-1.5 text-xs font-semibold">Save</button>
       {% if rec %}
       <button name="action" value="delete" onclick="return confirm('Delete the entry for {{ d.strftime('%d %b') }}?')" class="border border-red-300 text-red-600 hover:bg-red-50 rounded-lg px-3 py-1.5 text-xs">Delete</button>
-      {% endif %}
+      {% endif %}{% endif %}
     </span>
   </form>
   {% else %}
@@ -78,9 +80,10 @@
       <div class="flex justify-between items-center px-4 py-2 gap-2">
         <span>{{ a.date.strftime('%d %b %Y') }} <span class="text-slate-400">{{ a.mode }}{% if a.reason %} · {{ a.reason }}{% endif %}</span></span>
         <span class="flex items-center gap-3 whitespace-nowrap"><b>{{ a.amount|inr }}</b>
+          {% if can_change(a.date) %}
           <a href="{{ url_for('advances.edit', adv_id=a.id, next=request.full_path) }}" class="text-blue-700 text-xs">Edit</a>
           <form method="post" action="{{ url_for('advances.delete', adv_id=a.id) }}" onsubmit="return confirm('Delete this advance of {{ a.amount|inr }}?')">
-            <button class="text-red-500 text-xs">Delete</button></form></span>
+            <button class="text-red-500 text-xs">Delete</button></form>{% endif %}</span>
       </div>
       {% else %}<div class="px-4 py-4 text-slate-400">No advances.</div>{% endfor %}
     </div>
@@ -95,8 +98,9 @@
         <span class="flex items-center gap-3 whitespace-nowrap"><b>{{ p.net_paid|inr }}</b>
           <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="text-blue-700 text-xs">Slip</a>
           <a href="{{ url_for('salary.share', payment_id=p.id) }}" class="text-emerald-600 text-xs font-semibold">WhatsApp</a>
+          {% if can_change(p.paid_on) %}
           <form method="post" action="{{ url_for('salary.delete', payment_id=p.id) }}" onsubmit="return confirm('Remove this salary entry? Advance recovery will be reversed.')">
-            <button class="text-red-500 text-xs">Delete</button></form></span>
+            <button class="text-red-500 text-xs">Delete</button></form>{% endif %}</span>
       </div>
       {% else %}<div class="px-4 py-4 text-slate-400">No salary paid yet.</div>{% endfor %}
     </div>

@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from .. import db
 from ..models import ATTENDANCE_STATUSES, Advance, Attendance, Employee, SalaryPayment
 from ..payroll import attendance_summary
-from ..utils import month_bounds, owner_required, parse_month, to_dec, today
+from ..utils import can_change, month_bounds, owner_required, parse_month, to_dec, today
 
 bp = Blueprint("employees", __name__, url_prefix="/employees")
 
@@ -28,7 +28,6 @@ def _fill(emp, f):
 
 @bp.route("/")
 @login_required
-@owner_required
 def index():
     show = request.args.get("show", "active")
     q = Employee.query
@@ -45,7 +44,6 @@ def index():
 
 @bp.route("/new", methods=["GET", "POST"])
 @login_required
-@owner_required
 def new():
     emp = Employee(active=True, joining_date=today())
     if request.method == "POST":
@@ -62,7 +60,6 @@ def new():
 
 @bp.route("/<int:emp_id>/edit", methods=["GET", "POST"])
 @login_required
-@owner_required
 def edit(emp_id):
     emp = db.get_or_404(Employee, emp_id)
     if request.method == "POST":
@@ -78,7 +75,6 @@ def edit(emp_id):
 
 @bp.route("/<int:emp_id>")
 @login_required
-@owner_required
 def ledger(emp_id):
     emp = db.get_or_404(Employee, emp_id)
     year, month = parse_month(request.args.get("month"))
@@ -105,7 +101,6 @@ def ledger(emp_id):
 
 @bp.route("/<int:emp_id>/day/<day>", methods=["POST"])
 @login_required
-@owner_required
 def day_update(emp_id, day):
     """Admin edit / delete of one day's ledger entry (attendance, OT, DA, remarks)."""
     emp = db.get_or_404(Employee, emp_id)
@@ -116,6 +111,9 @@ def day_update(emp_id, day):
         return redirect(url_for("employees.ledger", emp_id=emp.id))
     rec = Attendance.query.filter_by(employee_id=emp.id, date=d).first()
     month_value = d.strftime("%Y-%m")
+    if not can_change(d):
+        flash("Supervisors can change only today's entries", "error")
+        return redirect(url_for("employees.ledger", emp_id=emp.id, month=month_value))
 
     if request.form.get("action") == "delete":
         if rec:

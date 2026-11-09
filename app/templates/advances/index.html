@@ -10,7 +10,11 @@
       {% for e in employees %}<option value="{{ e.id }}">{{ e.name }} ({{ e.emp_type }})</option>{% endfor %}
     </select>
     <input name="amount" placeholder="Amount ₹" inputmode="decimal" required class="{{ inp }}">
-    <input type="date" name="date" value="{{ today.isoformat() }}" class="{{ inp }}">
+    {% if current_user.is_owner %}
+    <input type="date" name="date" value="{{ today.isoformat() }}" max="{{ today.isoformat() }}" class="{{ inp }}">
+    {% else %}
+    <div class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900">📅 {{ today.strftime('%a, %d %b %Y') }} <span class="font-normal text-xs text-blue-700">(today)</span></div>
+    {% endif %}
     <select name="mode" class="{{ inp }}">
       {% for m in ['Cash', 'UPI', 'Bank'] %}<option>{{ m }}</option>{% endfor %}
     </select>
@@ -30,8 +34,9 @@
           <span><a href="{{ url_for('employees.ledger', emp_id=a.employee_id) }}" class="font-medium text-blue-700">{{ a.employee.name }}</a>
             <span class="text-slate-400">{{ a.date.strftime('%d %b') }} · {{ a.mode }}{% if a.reason %} · {{ a.reason }}{% endif %}</span></span>
           <span class="flex items-center gap-3"><b>{{ a.amount|inr }}</b>
+            {% if can_change(a.date) %}
             <form method="post" action="{{ url_for('advances.delete', adv_id=a.id) }}" onsubmit="return confirm('Delete this advance?')">
-              <button class="text-red-500 text-xs">Delete</button></form></span>
+              <button class="text-red-500 text-xs">Delete</button></form>{% endif %}</span>
         </div>
         {% else %}<div class="px-4 py-4 text-slate-400">No advances this month.</div>{% endfor %}
       </div>

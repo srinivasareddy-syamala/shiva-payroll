@@ -2,10 +2,10 @@
 {% from "vehicles/_status.html" import badge %}
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-  <h1 class="text-2xl font-bold text-blue-950">{{ 'Vehicle expenses' if current_user.is_owner else 'My vehicle entries' }} — {{ month_label }}</h1>
+  <h1 class="text-2xl font-bold text-blue-950">Vehicle expenses — {{ month_label }}</h1>
   <div class="flex gap-2">
     <a href="{{ url_for('vehicles.expense_new') }}" class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-4 py-2 text-sm font-semibold">+ Add expense</a>
-    {% if current_user.is_owner %}
+    {% if true %}
     <a href="{{ url_for('vehicles.expenses_excel', **args) }}" class="bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm">⬇ Excel</a>
     {% endif %}
   </div>
@@ -29,7 +29,7 @@
     <div class="flex justify-between items-start gap-2">
       <div>
         <div class="font-semibold">{{ categories[e.category] }} {{ e.category }} · {{ e.vehicle.number }}</div>
-        <div class="text-xs text-slate-500">{{ e.date.strftime('%d %b %Y') }}{% if e.created_at %} · {{ e.created_at|localtime('%I:%M %p') }}{% endif %}{% if current_user.is_owner and e.submitter %} · {{ e.submitter.username }}{% endif %}</div>
+        <div class="text-xs text-slate-500">{{ e.date.strftime('%d %b %Y') }}{% if e.created_at %} · {{ e.created_at|localtime('%I:%M %p') }}{% endif %}{% if e.submitter %} · {{ e.submitter.username }}{% endif %}</div>
       </div>
       <div class="text-right"><div class="font-bold">{{ e.amount|inr }}</div>{{ badge(e.status) }}</div>
     </div>
@@ -40,16 +40,16 @@
     </div>
     <div class="flex gap-4 mt-2 text-sm">
       {% if e.slip_file %}<a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700">📎 Bill</a>{% endif %}
-      {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status != 'Approved') %}
+      {% if current_user.is_owner or (e.status != 'Approved' and e.date == local_today()) %}
         <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.full_path) }}" class="text-blue-700">{{ 'Correct & resend' if e.status == 'Rejected' else 'Edit' }}</a>{% endif %}
-      {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status == 'Pending') %}
+      {% if current_user.is_owner or (e.status == 'Pending' and e.date == local_today()) %}
         <form method="post" action="{{ url_for('vehicles.expense_delete', eid=e.id) }}" onsubmit="return confirm('Delete this expense?')"><button class="text-red-500">Delete</button></form>{% endif %}
     </div>
   </div>
   {% else %}
   <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400">No expenses for this filter.</div>
   {% endfor %}
-  {% if items and current_user.is_owner %}<div class="text-right font-bold px-1">Approved total: {{ total|inr }}</div>{% endif %}
+  {% if items %}<div class="text-right font-bold px-1">Approved total: {{ total|inr }}</div>{% endif %}
 </div>
 
 <!-- desktop: table -->
@@ -72,16 +72,16 @@
           {% if e.vendor %} · {{ e.vendor }}{% endif %}
           {% if e.description %}<div class="text-xs text-slate-400">{{ e.description }}</div>{% endif %}
           {% if e.status == 'Rejected' and e.review_note %}<div class="text-xs text-red-600">Reason: {{ e.review_note }}</div>{% endif %}
-          <div class="text-[11px] text-slate-400">{% if e.created_at %}entered {{ e.created_at|localtime }}{% endif %}{% if current_user.is_owner and e.submitter %} · by {{ e.submitter.username }}{% endif %}</div>
+          <div class="text-[11px] text-slate-400">{% if e.created_at %}entered {{ e.created_at|localtime }}{% endif %}{% if e.submitter %} · by {{ e.submitter.username }}{% endif %}</div>
         </td>
         <td class="px-3 py-2 text-right font-semibold whitespace-nowrap">{{ e.amount|inr }}</td>
         <td class="px-3 py-2">{% if e.slip_file %}<a href="{{ url_for('vehicles.slip', eid=e.id) }}" target="_blank" class="text-blue-700">📎 View</a>{% else %}<span class="text-slate-300">—</span>{% endif %}</td>
         <td class="px-3 py-2">{{ badge(e.status) }}</td>
         <td class="px-3 py-2 whitespace-nowrap text-right">
-          {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status != 'Approved') %}
+          {% if current_user.is_owner or (e.status != 'Approved' and e.date == local_today()) %}
             <a href="{{ url_for('vehicles.expense_edit', eid=e.id, next=request.full_path) }}" class="text-blue-700 text-xs">Edit</a>
           {% endif %}
-          {% if current_user.is_owner or (e.submitted_by == current_user.id and e.status == 'Pending') %}
+          {% if current_user.is_owner or (e.status == 'Pending' and e.date == local_today()) %}
             <form method="post" action="{{ url_for('vehicles.expense_delete', eid=e.id) }}" class="inline" onsubmit="return confirm('Delete this expense?')">
               <button class="text-red-500 text-xs ml-2">Delete</button></form>
           {% endif %}

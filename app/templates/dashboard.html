@@ -19,7 +19,7 @@
   {{ card('Active employees', stats.active, 'blue', '👥') }}
   {{ card('Present today', stats.present_today ~ ' / ' ~ stats.active, 'emerald', '✅') }}
   {{ card('Attendance marked', stats.marked_today ~ ' / ' ~ stats.active, 'amber' if stats.marked_today < stats.active else 'emerald', '📋') }}
-  {% if current_user.is_owner %}
+  {% if true %}
     {{ card('Advances this month', stats.advances_month|inr, 'orange', '💵') }}
     {{ card('Salary paid this month', stats.salary_month|inr, 'indigo', '🧾') }}
     {{ card('Advance outstanding', stats.advance_outstanding|inr, 'red', '⚠️') }}
@@ -42,7 +42,7 @@
     <div class="text-lg font-semibold">📋 Mark today's attendance</div>
     <div class="text-blue-100 text-sm">P / ½ / A, overtime and driver DA</div>
   </a>
-  {% if current_user.is_owner %}
+  {% if true %}
   <a href="{{ url_for('advances.index') }}" class="block bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 text-white rounded-2xl p-5 shadow-md">
     <div class="text-lg font-semibold">💵 Give advance</div>
     <div class="text-orange-100 text-sm">Record cash / UPI advance</div>
@@ -58,7 +58,7 @@
   {% endif %}
 </div>
 
-{% if current_user.is_owner and stats.recent_advances %}
+{% if stats.recent_advances %}
 <h2 class="text-lg font-semibold mt-8 mb-3 text-blue-950">Recent advances</h2>
 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 divide-y">
   {% for a in stats.recent_advances %}

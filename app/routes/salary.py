@@ -5,20 +5,19 @@ from io import BytesIO
 from urllib.parse import quote
 
 from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from .. import db
 from ..models import Employee, SalaryPayment, Setting
 from ..payroll import calculate, da_entries
 from ..pdf import salary_slip_pdf
-from ..utils import days, inr, money, month_bounds, owner_required, parse_month, to_dec, today
+from ..utils import can_change, days, inr, money, month_bounds, parse_month, to_dec, today
 
 bp = Blueprint("salary", __name__, url_prefix="/salary")
 
 
 @bp.route("/", methods=["GET", "POST"])
 @login_required
-@owner_required
 def run():
     year, month = parse_month(request.values.get("month"))
     start, _, _ = month_bounds(year, month)
@@ -26,17 +25,20 @@ def run():
 
     if request.method == "POST":
         selected = set(request.form.getlist("pay"))
-        saved = 0
+        saved = skipped = 0
         for emp in employees:
             if str(emp.id) not in selected:
                 continue
             c = calculate(emp, year, month)
+            if c["existing"] and not can_change(c["existing"].paid_on):
+                skipped += 1
+                continue  # supervisors cannot change salary saved on an earlier day
             bonus = max(to_dec(request.form.get(f"bonus_{emp.id}")), 0)
             adv = to_dec(request.form.get(f"adv_{emp.id}"))
             other = max(to_dec(request.form.get(f"other_{emp.id}")), 0)
             adv = max(Decimal("0"), min(adv, c["advance_outstanding"]))  # never recover more than owed
             net = money(c["earned"] + c["ot_amount"] + c["da_amount"] + bonus - adv - other)
-            paid_on = request.form.get("paid_on")
+            paid_on = request.form.get("paid_on") if current_user.is_owner else None
 
             p = c["existing"] or SalaryPayment(employee_id=emp.id, year=year, month=month)
             p.days_in_month = c["days_in_month"]
@@ -58,6 +60,8 @@ def run():
             saved += 1
         db.session.commit()
         flash(f"Salary saved for {saved} employees", "success" if saved else "error")
+        if skipped:
+            flash(f"{skipped} salary entr{'y' if skipped == 1 else 'ies'} saved on an earlier day {'was' if skipped == 1 else 'were'} not changed (only the owner can change it)", "error")
         return redirect(url_for("salary.run", month=f"{year:04d}-{month:02d}"))
 
     rows = [(emp, calculate(emp, year, month)) for emp in employees]
@@ -75,7 +79,6 @@ def _month_payments(year, month):
 
 @bp.route("/register")
 @login_required
-@owner_required
 def register():
     year, month = parse_month(request.args.get("month"))
     start, _, _ = month_bounds(year, month)
@@ -87,7 +90,6 @@ def register():
 
 @bp.route("/register.xlsx")
 @login_required
-@owner_required
 def register_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
@@ -128,7 +130,6 @@ def _slip_filename(p):
 
 @bp.route("/slip/<int:payment_id>.pdf")
 @login_required
-@owner_required
 def slip(payment_id):
     p = db.get_or_404(SalaryPayment, payment_id)
     pdf = salary_slip_pdf(p, Setting.get_all(), da_entries(p.employee, p.year, p.month))
@@ -172,7 +173,6 @@ def whatsapp_text(p, st):
 
 @bp.route("/<int:payment_id>/share")
 @login_required
-@owner_required
 def share(payment_id):
     p = db.get_or_404(SalaryPayment, payment_id)
     st = Setting.get_all()
@@ -185,9 +185,11 @@ def share(payment_id):
 
 @bp.route("/<int:payment_id>/delete", methods=["POST"])
 @login_required
-@owner_required
 def delete(payment_id):
     p = db.get_or_404(SalaryPayment, payment_id)
+    if not can_change(p.paid_on):
+        flash("Supervisors can delete only salary saved today", "error")
+        return redirect(request.referrer or url_for("salary.run"))
     m = f"{p.year:04d}-{p.month:02d}"
     db.session.delete(p)
     db.session.commit()

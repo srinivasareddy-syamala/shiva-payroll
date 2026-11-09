@@ -2,9 +2,7 @@
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
   <h1 class="text-xl sm:text-2xl font-bold text-blue-950">Attendance</h1>
-  {% if current_user.is_owner %}
   <a href="{{ url_for('attendance.monthly') }}" class="text-sm text-blue-700 underline">Monthly view</a>
-  {% endif %}
 </div>
 
 {% if current_user.is_owner %}
@@ -85,7 +83,7 @@
 function markAll(code) { document.querySelectorAll('input.att-' + code).forEach(r => r.checked = true); }
 </script>
 {% else %}
-<p class="text-slate-500">No active employees. {% if current_user.is_owner %}<a class="text-blue-700 underline" href="{{ url_for('employees.new') }}">Add one</a>.{% endif %}</p>
+<p class="text-slate-500">No active employees. <a class="text-blue-700 underline" href="{{ url_for('employees.new') }}">Add one</a>.</p>
 {% endif %}
 <script>
 (function tick() {

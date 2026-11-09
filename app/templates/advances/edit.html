@@ -5,7 +5,11 @@
 <form method="post" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3 max-w-md">
   <input type="hidden" name="next" value="{{ next }}">
   <label class="block text-sm font-medium">Amount ₹<input name="amount" value="{{ adv.amount|days }}" inputmode="decimal" required class="{{ inp }} mt-1"></label>
+  {% if current_user.is_owner %}
   <label class="block text-sm font-medium">Date<input type="date" name="date" value="{{ adv.date.isoformat() }}" class="{{ inp }} mt-1"></label>
+  {% else %}
+  <div class="text-sm"><span class="font-medium">Date:</span> {{ adv.date.strftime('%d %b %Y') }} (today)</div>
+  {% endif %}
   <label class="block text-sm font-medium">Mode
     <select name="mode" class="{{ inp }} mt-1">{% for m in ['Cash','UPI','Bank'] %}<option {{ 'selected' if adv.mode == m }}>{{ m }}</option>{% endfor %}</select></label>
   <label class="block text-sm font-medium">Reason<input name="reason" value="{{ adv.reason or '' }}" class="{{ inp }} mt-1"></label>

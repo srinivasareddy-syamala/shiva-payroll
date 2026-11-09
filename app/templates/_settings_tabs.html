@@ -1,4 +1,4 @@
 <div class="flex gap-2 mb-5 text-sm">
-  <a href="{{ url_for('settings.index') }}" class="px-4 py-2 rounded-lg {{ 'bg-blue-700 text-white font-semibold' if request.endpoint == 'settings.index' else 'bg-white border border-slate-300' }}">Company &amp; my password</a>
-  <a href="{{ url_for('auth.users') }}" class="px-4 py-2 rounded-lg {{ 'bg-blue-700 text-white font-semibold' if request.endpoint == 'auth.users' else 'bg-white border border-slate-300' }}">Users &amp; passwords</a>
+  <a href="{{ url_for('settings.index') }}" class="px-4 py-2 rounded-lg {{ 'bg-blue-700 text-white font-semibold' if request.endpoint == 'settings.index' else 'bg-white border border-slate-300' }}">{{ 'Company & my password' if current_user.is_owner else 'My password' }}</a>
+  {% if current_user.is_owner %}<a href="{{ url_for('auth.users') }}" class="px-4 py-2 rounded-lg {{ 'bg-blue-700 text-white font-semibold' if request.endpoint == 'auth.users' else 'bg-white border border-slate-300' }}">Users &amp; passwords</a>{% endif %}
 </div>
