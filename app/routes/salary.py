@@ -124,6 +124,14 @@ def run():
         "already_paid": sum((c["existing"].net_paid for _, c in rows if c["existing"]), Decimal(0)),
     }
     summary["net_to_pay"] = summary["unpaid_gross"] - summary["unpaid_recovery"]
+    # balance BEFORE this period's salary (paid rows: what was due before their recovery)
+    summary["balance_before"] = sum(((c["existing"].advance_due if c["existing"] else c["advance_outstanding"])
+                                     for _, c in rows), Decimal(0))
+    summary["already_recovered"] = sum((c["existing"].advance_deducted for _, c in rows if c["existing"]), Decimal(0))
+    summary["older_balance"] = summary["balance_before"] - summary["advance_taken"]
+    summary["carry_forward"] = sum(((c["existing"].advance_balance_after if c["existing"]
+                                     else c["advance_outstanding"] - c["suggested_advance"]) for _, c in rows), Decimal(0))
+    summary["capped"] = sum(1 for _, c in rows if not c["existing"] and c["advance_outstanding"] > c["gross"])
     return render_template("salary/run.html", rows=rows, rng=rng, today=today(),
                            month_value=f"{end.year:04d}-{end.month:02d}",
                            emp_type=emp_type, q=q, status=status, counts=counts, summary=summary)

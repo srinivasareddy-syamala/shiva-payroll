@@ -31,8 +31,8 @@
   </a>
   <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-red-500 p-4">
     <div class="text-[11px] uppercase text-slate-500">Total advance balance</div>
-    <div class="text-2xl font-bold text-red-600">{{ summary.outstanding|inr }}</div>
-    <div class="text-xs text-slate-400">all unrecovered advances up to {{ rng.end.strftime('%d %b') }} · {{ summary.unpaid_recovery|inr }} to recover now</div>
+    <div class="text-2xl font-bold text-red-600">{{ summary.balance_before|inr }}</div>
+    <div class="text-xs text-slate-400">unrecovered up to {{ rng.end.strftime('%d %b') }} · {{ (summary.unpaid_recovery + summary.already_recovered)|inr }} recovered · {{ summary.carry_forward|inr }} carries forward</div>
   </div>
   <div class="bg-white rounded-2xl border border-slate-200 border-l-4 border-l-emerald-500 p-4">
     <div class="text-[11px] uppercase text-slate-500">Gross earned</div>
@@ -49,6 +49,13 @@
     <div class="text-2xl font-bold">{{ summary.already_paid|inr }}</div>
     <div class="text-xs text-slate-400">{{ counts.paid }} employee{{ 's' if counts.paid != 1 }}</div>
   </div>
+</div>
+<div class="mb-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700 space-y-1">
+  <div class="font-semibold text-blue-950">How the figures add up</div>
+  <div>Gross earned (not paid yet) <b>{{ summary.unpaid_gross|inr }}</b> − advance recovered now <b>{{ summary.unpaid_recovery|inr }}</b> = <b class="text-blue-900">net to pay {{ summary.net_to_pay|inr }}</b></div>
+  <div>Advance balance <b>{{ summary.balance_before|inr }}</b> = taken in these dates <b>{{ summary.advance_taken|inr }}</b> + still owed from earlier <b>{{ summary.older_balance|inr }}</b></div>
+  <div>Advance balance <b>{{ summary.balance_before|inr }}</b> = recovered now <b>{{ summary.unpaid_recovery|inr }}</b>{% if summary.already_recovered %} + already recovered in saved salaries <b>{{ summary.already_recovered|inr }}</b>{% endif %} + carried to next salary <b>{{ summary.carry_forward|inr }}</b>
+    {% if summary.capped %}<span class="text-amber-700">· {{ summary.capped }} {{ 'employees owe' if summary.capped != 1 else 'employee owes' }} more than they earned, so only their earnings are recovered (marked ⚠ below)</span>{% endif %}</div>
 </div>
 <p class="text-sm mb-2"><b>{{ counts.total }}</b> employees · <span class="text-emerald-700">{{ counts.paid }} paid</span> · <span class="text-slate-600">{{ counts.total - counts.paid }} not paid</span>{% if counts.changed %} · <span class="text-amber-700">{{ counts.changed }} attendance changed</span>{% endif %}</p>
 <p class="text-sm text-slate-500 mb-4">Tick the employees to pay (header box ticks all shown), then Save. Advance deduction is pre-filled — change it to recover in instalments.</p>
@@ -93,7 +100,8 @@
           <td class="px-3 py-2 text-right text-orange-700">{{ c.da_amount|inr }}{% if c.da_days %}<div class="text-xs text-slate-400">{{ c.da_days }} day{{ 's' if c.da_days != 1 }}</div>{% endif %}</td>
           <td class="px-3 py-2 text-right"><input name="bonus_{{ e.id }}" value="{{ p.bonus if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="bonus"></td>
           <td class="px-3 py-2 text-right text-red-600">{{ c.advance_outstanding|inr }}
-            {% if c.advance_taken %}<div class="text-[11px] text-orange-600">taken {{ c.advance_taken|inr }} in these dates</div>{% endif %}</td>
+            {% if c.advance_taken %}<div class="text-[11px] text-orange-600">taken {{ c.advance_taken|inr }} in these dates</div>{% endif %}
+            {% if not p and c.advance_outstanding > c.gross %}<div class="text-[11px] text-amber-700" title="Advance is more than earnings; the rest carries forward">⚠ {{ (c.advance_outstanding - c.suggested_advance)|inr }} carries forward</div>{% endif %}</td>
           <td class="px-3 py-2 text-right"><input name="adv_{{ e.id }}" value="{{ p.advance_deducted if p else c.suggested_advance }}" inputmode="decimal" class="{{ num }} calc" data-k="adv"></td>
           <td class="px-3 py-2 text-right"><input name="other_{{ e.id }}" value="{{ p.other_deductions if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="other"></td>
           <td class="px-3 py-2 text-right font-bold net"></td>
