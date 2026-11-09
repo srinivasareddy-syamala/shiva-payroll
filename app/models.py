@@ -75,17 +75,23 @@ class Employee(db.Model):
         recovered = q.scalar()
         return Decimal(given) - Decimal(recovered)
 
-    def advance_due_for_month(self, year, month):
-        """Advance owed when paying salary for (year, month): advances given up to that
-        month's end minus recoveries in salary of EARLIER months."""
-        import calendar as _cal
-        month_end = date(year, month, _cal.monthrange(year, month)[1])
+    def advance_due_for_period(self, start, end, exclude_payment_id=None):
+        """Advance owed when paying salary for start..end: advances given up to `end` minus
+        recoveries in OTHER salaries that started earlier or overlap this period
+        (later periods are ignored so an old slip keeps showing the balance of its time)."""
         given = db.session.query(func.coalesce(func.sum(Advance.amount), 0)) \
-            .filter(Advance.employee_id == self.id, Advance.date <= month_end).scalar()
-        recovered = db.session.query(func.coalesce(func.sum(SalaryPayment.advance_deducted), 0)) \
+            .filter(Advance.employee_id == self.id, Advance.date <= end).scalar()
+        q = db.session.query(func.coalesce(func.sum(SalaryPayment.advance_deducted), 0)) \
             .filter(SalaryPayment.employee_id == self.id,
-                    (SalaryPayment.year * 100 + SalaryPayment.month) < year * 100 + month).scalar()
-        return Decimal(given) - Decimal(recovered)
+                    (SalaryPayment.period_start < start)
+                    | ((SalaryPayment.period_start <= end) & (SalaryPayment.period_end >= start)))
+        if exclude_payment_id:
+            q = q.filter(SalaryPayment.id != exclude_payment_id)
+        return Decimal(given) - Decimal(q.scalar())
+
+    def advance_due_for_month(self, year, month):
+        import calendar as _cal
+        return self.advance_due_for_period(date(year, month, 1), date(year, month, _cal.monthrange(year, month)[1]))
 
     @property
     def whatsapp_number(self):
@@ -140,12 +146,14 @@ class Advance(db.Model):
 
 class SalaryPayment(db.Model):
     __tablename__ = "salary_payments"
-    __table_args__ = (db.UniqueConstraint("employee_id", "year", "month", name="uq_salary_emp_month"),)
+    __table_args__ = (db.Index("uq_salary_emp_period", "employee_id", "period_start", "period_end", unique=True),)
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False, index=True)
-    year = db.Column(db.Integer, nullable=False)
+    year = db.Column(db.Integer, nullable=False)    # year/month of period_end (for the monthly register)
     month = db.Column(db.Integer, nullable=False)
-    days_in_month = db.Column(db.Integer, nullable=False)
+    period_start = db.Column(db.Date)               # salary period, e.g. a week, a month or custom dates
+    period_end = db.Column(db.Date)
+    days_in_month = db.Column(db.Integer, nullable=False)   # number of days in the period
     paid_days = db.Column(db.Numeric(5, 1), nullable=False, default=0)
     ot_hours = db.Column(db.Numeric(6, 2), nullable=False, default=0)
     rate = db.Column(db.Numeric(10, 2), nullable=False)
@@ -171,8 +179,37 @@ class SalaryPayment(db.Model):
         return self.advance_deducted + self.other_deductions
 
     @property
+    def start(self):
+        import calendar as _cal
+        return self.period_start or date(self.year, self.month, 1)
+
+    @property
+    def end(self):
+        import calendar as _cal
+        return self.period_end or date(self.year, self.month, _cal.monthrange(self.year, self.month)[1])
+
+    @property
+    def is_full_month(self):
+        import calendar as _cal
+        s, e = self.start, self.end
+        return s.day == 1 and s.year == e.year and s.month == e.month and e.day == _cal.monthrange(e.year, e.month)[1]
+
+    @property
+    def period_label(self):
+        s, e = self.start, self.end
+        if self.is_full_month:
+            return s.strftime("%B %Y")
+        if s == e:
+            return s.strftime("%d %b %Y")
+        return f"{s:%d %b} – {e:%d %b %Y}"
+
+    @property
+    def advance_due(self):
+        return self.employee.advance_due_for_period(self.start, self.end, exclude_payment_id=self.id)
+
+    @property
     def advance_balance_after(self):
-        return self.employee.advance_due_for_month(self.year, self.month) - self.advance_deducted
+        return self.advance_due - self.advance_deducted
 
 
 # ---------- Settings (company details editable in the app) ----------

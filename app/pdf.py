@@ -62,7 +62,7 @@ def salary_slip_pdf(p, st, da_list):
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
                             topMargin=12 * mm, bottomMargin=12 * mm,
-                            title=f"Salary slip {emp.name} {calendar.month_name[p.month]} {p.year}")
+                            title=f"Salary slip {emp.name} {p.period_label}")
     W = doc.width
     base = ParagraphStyle("b", fontName="DejaVu", fontSize=9, leading=12)
     small = ParagraphStyle("s", parent=base, fontSize=8, textColor=GREY, leading=10)
@@ -81,7 +81,7 @@ def salary_slip_pdf(p, st, da_list):
         company_lines.append(Paragraph(f"Ph: {st['company_phone']}", white))
     logo = Image(LOGO, width=24 * mm, height=24 * mm) if os.path.exists(LOGO) else ""
     title = [Paragraph("SALARY SLIP", white_right_big),
-             Paragraph(f"{calendar.month_name[p.month]} {p.year}", white_right)]
+             Paragraph(p.period_label, white_right)]
     head = Table([[logo, company_lines, title]], colWidths=[28 * mm, W - 28 * mm - 50 * mm, 50 * mm])
     head.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), BLUE),
@@ -102,7 +102,8 @@ def salary_slip_pdf(p, st, da_list):
         kv("Phone", emp.phone or "-") + kv("Vehicle no.", emp.vehicle_no or "-"),
         kv("Pay basis", f"{p.pay_type} @ {_rs(p.rate)}" + (" / day" if p.pay_type == "Daily" else " / month"))
         + kv("Paid on", f"{p.paid_on.strftime('%d-%m-%Y') if p.paid_on else '-'} ({p.payment_mode})"),
-        kv("Paid days", f"{days(p.paid_days)} of {p.days_in_month}") + kv("Overtime", f"{days(p.ot_hours)} hrs"),
+        kv("Paid days", f"{days(p.paid_days)} of {p.days_in_month}" + ("" if p.is_full_month else f" ({p.start:%d %b} – {p.end:%d %b})"))
+        + kv("Overtime", f"{days(p.ot_hours)} hrs"),
     ]
     cw = [24 * mm, W / 2 - 24 * mm, 24 * mm, W / 2 - 24 * mm]
     t = Table(info, colWidths=cw)
@@ -123,7 +124,8 @@ def salary_slip_pdf(p, st, da_list):
     bold = ParagraphStyle("bo", parent=base, fontName="DejaVu-Bold")
 
     earn = [("Basic earned", p.earned,
-             f"{_rs(p.rate)} ÷ {p.days_in_month} × {days(p.paid_days)}" if p.pay_type == "Monthly"
+             (f"{_rs(p.rate)} ÷ {p.days_in_month} × {days(p.paid_days)}" if p.is_full_month else f"{days(p.paid_days)} days at monthly rate {_rs(p.rate)}")
+             if p.pay_type == "Monthly"
              else f"{_rs(p.rate)} × {days(p.paid_days)} days")]
     if p.ot_amount:
         earn.append(("Overtime", p.ot_amount, f"{days(p.ot_hours)} hrs × {_rs(emp.ot_rate)}"))
@@ -177,7 +179,7 @@ def salary_slip_pdf(p, st, da_list):
     story += [net, Spacer(1, 2 * mm)]
     story.append(Paragraph(
         f"Advance balance after this salary: <b>{_rs(p.advance_balance_after)}</b>"
-        f" &nbsp;&nbsp;(due before: {_rs(p.employee.advance_due_for_month(p.year, p.month))}, recovered now: {_rs(p.advance_deducted)})",
+        f" &nbsp;&nbsp;(due before: {_rs(p.advance_due)}, recovered now: {_rs(p.advance_deducted)})",
         base))
     if p.remarks:
         story.append(Paragraph(f"Remarks: {p.remarks}", base))

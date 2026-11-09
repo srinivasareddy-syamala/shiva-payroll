@@ -10,6 +10,13 @@ MIGRATIONS = [
     "ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS da_amount NUMERIC(10,2) NOT NULL DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE",
     "ALTER TABLE attendance ADD COLUMN IF NOT EXISTS marked_at TIMESTAMP",
+    # salary periods (weekly / custom dates). Old monthly rows become full-month periods.
+    "ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS period_start DATE",
+    "ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS period_end DATE",
+    "UPDATE salary_payments SET period_start = make_date(year, month, 1), "
+    "period_end = (make_date(year, month, 1) + interval '1 month' - interval '1 day')::date WHERE period_start IS NULL",
+    "ALTER TABLE salary_payments DROP CONSTRAINT IF EXISTS uq_salary_emp_month",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_salary_emp_period ON salary_payments (employee_id, period_start, period_end)",
 ]
 
 

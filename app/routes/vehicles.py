@@ -25,9 +25,24 @@ def _int(v):
 
 
 def _month_ctx():
-    year, month = parse_month(request.args.get("month"))
-    start, end, _ = month_bounds(year, month)
-    return year, month, start, end, f"{year:04d}-{month:02d}", start.strftime("%B %Y")
+    """Date range for vehicle pages: ?range=today|this_week|last_week|this_month|last_month|custom&from&to,
+    or the older ?month=YYYY-MM. Returns (rng, start, end, month_value, label)."""
+    from ..utils import parse_range
+    a = request.args
+    if a.get("month") and not a.get("range"):
+        y, m = parse_month(a.get("month"))
+        s_, e_, _ = month_bounds(y, m)
+        rng = parse_range({"range": "custom", "from": s_.isoformat(), "to": e_.isoformat()})
+    else:
+        rng = parse_range(a, default="this_month")
+    return rng, rng["start"], rng["end"], f"{rng['end']:%Y-%m}", rng["label"]
+
+
+def _range_args(rng):
+    """Query args that reproduce the selected range in links."""
+    if rng["key"] == "custom":
+        return {"range": "custom", "from": rng["start"].isoformat(), "to": rng["end"].isoformat()}
+    return {"range": rng["key"]}
 
 
 def pending_count():
@@ -39,8 +54,20 @@ def pending_count():
 @bp.route("/")
 @login_required
 def index():
-    year, month, start, end, month_value, month_label = _month_ctx()
-    vehicles = Vehicle.query.order_by(Vehicle.active.desc(), Vehicle.number).all()
+    rng, start, end, month_value, month_label = _month_ctx()
+    vq = Vehicle.query
+    vtype, show, vsearch = request.args.get("vtype", ""), request.args.get("show", "active"), request.args.get("q", "").strip()
+    if vtype:
+        vq = vq.filter_by(vehicle_type=vtype)
+    if show == "active":
+        vq = vq.filter_by(active=True)
+    elif show == "inactive":
+        vq = vq.filter_by(active=False)
+    if vsearch:
+        vq = vq.outerjoin(Employee, Vehicle.driver_id == Employee.id).filter(
+            Vehicle.number.ilike(f"%{vsearch.replace(' ', '')}%") | Vehicle.model.ilike(f"%{vsearch}%")
+            | Employee.name.ilike(f"%{vsearch}%"))
+    vehicles = vq.order_by(Vehicle.active.desc(), Vehicle.number).all()
     totals = {}
     if True:
         rows = db.session.query(VehicleExpense.vehicle_id, VehicleExpense.category,
@@ -53,11 +80,14 @@ def index():
             t["total"] += amt
             if cat == "Diesel":
                 t["litres"] = lit
+    listed = {v.id for v in vehicles}
+    totals = {vid: t for vid, t in totals.items() if vid in listed}
     grand = {c: sum((t.get(c, 0) for t in totals.values()), Decimal(0)) for c in EXPENSE_CATEGORIES}
     grand["total"] = sum(grand.values(), Decimal(0))
     return render_template("vehicles/index.html", vehicles=vehicles, totals=totals, grand=grand,
                            categories=EXPENSE_CATEGORIES, month_value=month_value, month_label=month_label,
-                           pending=pending_count() if current_user.is_owner else 0)
+                           pending=pending_count() if current_user.is_owner else 0,
+                           rng=rng, rargs=_range_args(rng), vtype=vtype, show=show, q=vsearch, types=VEHICLE_TYPES)
 
 
 def _fill_vehicle(v, f):
@@ -128,7 +158,7 @@ def _drivers():
 @login_required
 def detail(vid):
     v = db.get_or_404(Vehicle, vid)
-    year, month, start, end, month_value, month_label = _month_ctx()
+    rng, start, end, month_value, month_label = _month_ctx()
     expenses = v.expenses.filter(VehicleExpense.date.between(start, end)) \
         .order_by(VehicleExpense.date.desc(), VehicleExpense.id.desc()).all()
     approved = [e for e in expenses if e.status == "Approved"]
@@ -150,7 +180,8 @@ def detail(vid):
     return render_template("vehicles/detail.html", v=v, expenses=expenses, by_cat=by_cat,
                            total=sum(by_cat.values(), Decimal(0)), litres=litres, km=km, kmpl=kmpl,
                            birds=birds, per_bird=(loading / birds).quantize(Decimal("0.01")) if birds else None,
-                           categories=EXPENSE_CATEGORIES, month_value=month_value, month_label=month_label)
+                           categories=EXPENSE_CATEGORIES, month_value=month_value, month_label=month_label,
+                           rng=rng, rargs=_range_args(rng))
 
 
 # ---------------- Expenses ----------------
@@ -287,27 +318,42 @@ def expense_delete(eid):
 
 
 def _expense_query():
-    year, month, start, end, month_value, month_label = _month_ctx()
+    rng, start, end, month_value, month_label = _month_ctx()
+    a = request.args
     q = VehicleExpense.query.filter(VehicleExpense.date.between(start, end))
-    vid, cat, status = _int(request.args.get("vehicle")), request.args.get("category"), request.args.get("status")
+    vid, cat, status = _int(a.get("vehicle")), a.get("category"), a.get("status")
     if vid:
         q = q.filter_by(vehicle_id=vid)
     if cat in EXPENSE_CATEGORIES:
         q = q.filter_by(category=cat)
     if status in ("Pending", "Approved", "Rejected"):
         q = q.filter_by(status=status)
-    return q.order_by(VehicleExpense.date.desc(), VehicleExpense.id.desc()), month_value, month_label
+    if a.get("mode"):
+        q = q.filter_by(payment_mode=a.get("mode"))
+    if _int(a.get("driver")):
+        q = q.filter_by(driver_id=_int(a.get("driver")))
+    if _int(a.get("user")):
+        q = q.filter_by(submitted_by=_int(a.get("user")))
+    if a.get("q", "").strip():
+        t = f"%{a.get('q').strip()}%"
+        q = q.filter(VehicleExpense.vendor.ilike(t) | VehicleExpense.bill_no.ilike(t) | VehicleExpense.description.ilike(t))
+    return q.order_by(VehicleExpense.date.desc(), VehicleExpense.id.desc()), rng, month_label
 
 
 @bp.route("/expenses")
 @login_required
 def expenses():
-    q, month_value, month_label = _expense_query()
+    q, rng, month_label = _expense_query()
     items = q.all()
     total = sum((e.amount for e in items if e.status == "Approved"), Decimal(0))
+    by_cat = {c: sum((e.amount for e in items if e.status == "Approved" and e.category == c), Decimal(0)) for c in EXPENSE_CATEGORIES}
+    pending_total = sum((e.amount for e in items if e.status == "Pending"), Decimal(0))
+    from ..models import User
+    users = User.query.order_by(User.username).all()
     return render_template("vehicles/expenses.html", items=items, total=total,
                            vehicles=Vehicle.query.order_by(Vehicle.number).all(), categories=EXPENSE_CATEGORIES,
-                           month_value=month_value, month_label=month_label, args=request.args)
+                           month_label=month_label, args=request.args, rng=rng, by_cat=by_cat,
+                           pending_total=pending_total, drivers=_drivers(), users=users)
 
 
 @bp.route("/expenses.xlsx")
@@ -316,7 +362,8 @@ def expenses_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
 
-    q, month_value, _ = _expense_query()
+    q, rng, _ = _expense_query()
+    month_value = f"{rng['start']}_{rng['end']}"
     wb = Workbook()
     ws = wb.active
     ws.title = month_value

@@ -9,27 +9,54 @@ from flask_login import current_user, login_required
 
 from .. import db
 from ..models import Employee, SalaryPayment, Setting
-from ..payroll import calculate, da_entries
+from ..payroll import calculate, da_entries, da_entries_range
 from ..pdf import salary_slip_pdf
 from ..utils import can_change, days, inr, money, month_bounds, parse_month, to_dec, today
 
 bp = Blueprint("salary", __name__, url_prefix="/salary")
 
 
+def _period_from_request():
+    """Salary period: ?range=this_week|last_week|this_month|last_month|custom&from&to,
+    or the older ?month=YYYY-MM (whole month). Default: this month."""
+    from ..utils import parse_range
+    vals = request.values
+    if vals.get("period_start") and vals.get("period_end"):
+        try:
+            s_ = datetime.strptime(vals["period_start"], "%Y-%m-%d").date()
+            e_ = datetime.strptime(vals["period_end"], "%Y-%m-%d").date()
+            return parse_range({"range": "custom", "from": s_.isoformat(), "to": e_.isoformat()})
+        except ValueError:
+            pass
+    if vals.get("month") and not vals.get("range"):
+        y, m = parse_month(vals.get("month"))
+        s_, e_, _ = month_bounds(y, m)
+        return parse_range({"range": "custom", "from": s_.isoformat(), "to": e_.isoformat()})
+    return parse_range(vals, default="this_month")
+
+
+def _run_url(rng, **extra):
+    return url_for("salary.run", range="custom", **{"from": rng["start"].isoformat(), "to": rng["end"].isoformat()}, **extra)
+
+
 @bp.route("/", methods=["GET", "POST"])
 @login_required
 def run():
-    year, month = parse_month(request.values.get("month"))
-    start, _, _ = month_bounds(year, month)
+    from ..payroll import calculate_period
+    rng = _period_from_request()
+    start, end = rng["start"], rng["end"]
     employees = Employee.query.filter_by(active=True).order_by(Employee.emp_type, Employee.name).all()
 
     if request.method == "POST":
         selected = set(request.form.getlist("pay"))
-        saved = skipped = 0
+        saved = skipped = overlapped = 0
         for emp in employees:
             if str(emp.id) not in selected:
                 continue
-            c = calculate(emp, year, month)
+            c = calculate_period(emp, start, end)
+            if c["overlap"]:
+                overlapped += 1
+                continue  # already paid for some of these dates
             if c["existing"] and not can_change(c["existing"].paid_on):
                 skipped += 1
                 continue  # supervisors cannot change salary saved on an earlier day
@@ -40,7 +67,9 @@ def run():
             net = money(c["earned"] + c["ot_amount"] + c["da_amount"] + bonus - adv - other)
             paid_on = request.form.get("paid_on") if current_user.is_owner else None
 
-            p = c["existing"] or SalaryPayment(employee_id=emp.id, year=year, month=month)
+            p = c["existing"] or SalaryPayment(employee_id=emp.id, period_start=start, period_end=end)
+            p.period_start, p.period_end = start, end
+            p.year, p.month = end.year, end.month
             p.days_in_month = c["days_in_month"]
             p.paid_days = c["paid_days"]
             p.ot_hours = c["ot_hours"]
@@ -59,29 +88,31 @@ def run():
             db.session.add(p)
             saved += 1
         db.session.commit()
-        flash(f"Salary saved for {saved} employees", "success" if saved else "error")
+        flash(f"Salary saved for {saved} employee{'s' if saved != 1 else ''} ({rng['label']})", "success" if saved else "error")
         if skipped:
             flash(f"{skipped} salary entr{'y' if skipped == 1 else 'ies'} saved on an earlier day {'was' if skipped == 1 else 'were'} not changed (only the owner can change it)", "error")
-        return redirect(url_for("salary.run", month=f"{year:04d}-{month:02d}"))
+        if overlapped:
+            flash(f"{overlapped} employee{'s were' if overlapped != 1 else ' was'} not paid: already paid for some of these dates", "error")
+        return redirect(_run_url(rng))
 
     emp_type, q, status = request.args.get("type", ""), request.args.get("q", "").strip(), request.args.get("status", "")
     shown = [e for e in employees if (emp_type not in ("Driver", "Worker") or e.emp_type == emp_type)
              and (not q or q.lower() in e.name.lower())]
-    rows = [(emp, calculate(emp, year, month)) for emp in shown]
+    rows = [(emp, calculate_period(emp, start, end)) for emp in shown]
     if status == "unpaid":
-        rows = [r for r in rows if not r[1]["existing"]]
+        rows = [r for r in rows if not r[1]["existing"] and not r[1]["overlap"]]
     elif status == "paid":
         rows = [r for r in rows if r[1]["existing"]]
     elif status == "changed":
         rows = [r for r in rows if r[1]["stale"]]
     counts = {"total": len(rows), "paid": sum(1 for r in rows if r[1]["existing"]),
-              "changed": sum(1 for r in rows if r[1]["stale"])}
-    unpaid = [c for _, c in rows if not c["existing"]]
+              "changed": sum(1 for r in rows if r[1]["stale"]),
+              "overlap": sum(1 for r in rows if r[1]["overlap"])}
+    unpaid = [c for _, c in rows if not c["existing"] and not c["overlap"]]
     summary = {
         "paid_days": sum((c["paid_days"] for _, c in rows), Decimal(0)),
         "gross": sum((c["gross"] for _, c in rows), Decimal(0)),
         "da": sum((c["da_amount"] for _, c in rows), Decimal(0)),
-        # paid employees: balance left after this month's recovery; unpaid: full amount due
         "outstanding": sum(((c["existing"].advance_balance_after if c["existing"] else c["advance_outstanding"])
                             for _, c in rows), Decimal(0)),
         "unpaid_count": len(unpaid),
@@ -90,8 +121,8 @@ def run():
         "already_paid": sum((c["existing"].net_paid for _, c in rows if c["existing"]), Decimal(0)),
     }
     summary["net_to_pay"] = summary["unpaid_gross"] - summary["unpaid_recovery"]
-    return render_template("salary/run.html", rows=rows, month_value=f"{year:04d}-{month:02d}",
-                           month_label=start.strftime("%B %Y"), today=today(),
+    return render_template("salary/run.html", rows=rows, rng=rng, today=today(),
+                           month_value=f"{end.year:04d}-{end.month:02d}",
                            emp_type=emp_type, q=q, status=status, counts=counts, summary=summary)
 
 
@@ -173,14 +204,15 @@ def register_excel():
 
 def _slip_filename(p):
     safe = "".join(ch for ch in p.employee.name if ch.isalnum() or ch in " _-").strip().replace(" ", "_")
-    return f"Salary_Slip_{safe}_{calendar.month_abbr[p.month]}_{p.year}.pdf"
+    per = f"{calendar.month_abbr[p.month]}_{p.year}" if p.is_full_month else f"{p.start:%d%b}-{p.end:%d%b%Y}"
+    return f"Salary_Slip_{safe}_{per}.pdf"
 
 
 @bp.route("/slip/<int:payment_id>.pdf")
 @login_required
 def slip(payment_id):
     p = db.get_or_404(SalaryPayment, payment_id)
-    pdf = salary_slip_pdf(p, Setting.get_all(), da_entries(p.employee, p.year, p.month))
+    pdf = salary_slip_pdf(p, Setting.get_all(), da_entries_range(p.employee, p.start, p.end))
     return send_file(BytesIO(pdf), mimetype="application/pdf", download_name=_slip_filename(p),
                      as_attachment=request.args.get("download") == "1")
 
@@ -189,7 +221,7 @@ def whatsapp_text(p, st):
     emp = p.employee
     lines = [
         f"*{st['company_name']}*",
-        f"*Salary Slip — {calendar.month_name[p.month]} {p.year}*",
+        f"*Salary Slip — {p.period_label}*",
         "",
         f"Name: {emp.name} ({emp.emp_type})",
         f"Paid days: {days(p.paid_days)} / {p.days_in_month}",
@@ -200,7 +232,7 @@ def whatsapp_text(p, st):
         lines.append(f"Overtime ({days(p.ot_hours)} h): {inr(p.ot_amount)}")
     if p.da_amount:
         lines.append(f"Day allowance (DA): {inr(p.da_amount)}")
-        for a in da_entries(emp, p.year, p.month):
+        for a in da_entries_range(emp, p.start, p.end):
             lines.append(f"   • {a.date.strftime('%d %b')}: {inr(a.da_amount)}" + (f" — {a.remarks}" if a.remarks else ""))
     if p.bonus:
         lines.append(f"Bonus: {inr(p.bonus)}")
@@ -238,11 +270,11 @@ def delete(payment_id):
     if not can_change(p.paid_on):
         flash("Supervisors can delete only salary saved today", "error")
         return redirect(request.referrer or url_for("salary.run"))
-    m = f"{p.year:04d}-{p.month:02d}"
+    back = url_for("salary.run", range="custom", **{"from": p.start.isoformat(), "to": p.end.isoformat()})
     db.session.delete(p)
     db.session.commit()
     flash("Salary entry removed — advance recovery reversed", "success")
-    return redirect(request.referrer or url_for("salary.run", month=m))
+    return redirect(request.referrer or back)
 
 
 def _report_data(args):
@@ -270,7 +302,7 @@ def _report_data(args):
                                      "other": Decimal(0), "net": Decimal(0), "advances": Decimal(0), "adv_count": 0})
     for p in pays:
         r = row(p.employee)
-        r["months"].append(f"{calendar.month_abbr[p.month]} {p.year}")
+        r["months"].append(p.period_label)
         r["gross"] += p.gross; r["recovered"] += p.advance_deducted
         r["other"] += p.other_deductions; r["net"] += p.net_paid
     for a in advs:
@@ -333,10 +365,10 @@ def report_excel():
         ws.column_dimensions[col].width = w
 
     ws2 = wb.create_sheet("Salaries")
-    header(ws2, ["Paid on", "Employee", "Month", "Paid days", "Gross", "Advance recovered", "Other ded.", "Net paid", "Mode"])
+    header(ws2, ["Paid on", "Employee", "Period", "Paid days", "Gross", "Advance recovered", "Other ded.", "Net paid", "Mode"])
     for p in d["pays"]:
         ws2.append([p.paid_on.strftime("%d-%m-%Y") if p.paid_on else "", p.employee.name,
-                    f"{calendar.month_abbr[p.month]} {p.year}", float(p.paid_days), float(p.gross),
+                    p.period_label, float(p.paid_days), float(p.gross),
                     float(p.advance_deducted), float(p.other_deductions), float(p.net_paid), p.payment_mode])
     ws3 = wb.create_sheet("Advances")
     header(ws3, ["Date", "Employee", "Amount", "Mode", "Reason"])

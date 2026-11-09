@@ -95,7 +95,7 @@ def ledger(emp_id):
         day_rows.append((d, records.get(d)))
     advances = emp.advances.order_by(Advance.date.desc()).all()
     payments = emp.payments.order_by(SalaryPayment.year.desc(), SalaryPayment.month.desc()).all()
-    month_payment = next((p for p in payments if p.year == year and p.month == month), None)
+    month_payment = next((p for p in payments if p.start <= end and p.end >= start), None)
     return render_template("employees/ledger.html", emp=emp, summary=summary,
                            day_rows=day_rows, statuses=ATTENDANCE_STATUSES,
                            advances=advances, payments=payments, month_payment=month_payment,
@@ -140,7 +140,8 @@ def day_update(emp_id, day):
         db.session.commit()
         flash(f"Saved {d.strftime('%d %b %Y')}", "success")
 
-    if SalaryPayment.query.filter_by(employee_id=emp.id, year=d.year, month=d.month).first():
+    if SalaryPayment.query.filter(SalaryPayment.employee_id == emp.id, SalaryPayment.period_start <= d,
+                                  SalaryPayment.period_end >= d).first():
         flash("Salary for this month was already saved. Open Salary and press Save again to update the slip.", "error")
     return redirect(url_for("employees.ledger", emp_id=emp.id, month=month_value) + f"#d{day}")
 

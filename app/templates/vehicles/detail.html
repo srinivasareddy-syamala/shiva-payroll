@@ -10,12 +10,14 @@
     {% if v.notes %}<p class="text-xs text-slate-500 mt-1">📝 {{ v.notes }}</p>{% endif %}
   </div>
   <div class="flex flex-wrap gap-2">
-    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></form>
+    <a href="{{ url_for('vehicles.expenses', vehicle=v.id, **rargs) }}" class="border border-slate-300 bg-white rounded-lg px-4 py-2 text-sm">Filter list</a>
     <a href="{{ url_for('vehicles.expense_new', vehicle=v.id) }}" class="bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">+ Expense</a>
     <a href="{{ url_for('vehicles.edit', vid=v.id) }}" class="border border-slate-300 bg-white rounded-lg px-4 py-2 text-sm">Edit</a>
   </div>
 </div>
 
+{% from "_range_filter.html" import range_filter %}
+{{ range_filter(rng) }}
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
   {% for cat, icon in categories.items() %}
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3">

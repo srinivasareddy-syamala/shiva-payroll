@@ -1,16 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-  <div>
-    <h1 class="text-2xl font-bold text-blue-950">Vehicles</h1>
-    {% if true %}<p class="text-sm text-slate-500">Approved expenses for {{ month_label }}</p>{% endif %}
-  </div>
+{% from "_range_filter.html" import range_filter %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+  <h1 class="text-2xl font-bold text-blue-950">Vehicles</h1>
   <div class="flex flex-wrap gap-2">
-    {% if true %}
-    <form><input type="month" name="month" value="{{ month_value }}" onchange="this.form.submit()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></form>
     <a href="{{ url_for('vehicles.new') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">+ Add vehicle</a>
-    {% endif %}
-    <a href="{{ url_for('vehicles.expenses') }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">All expenses</a>
+    <a href="{{ url_for('vehicles.expenses', **rargs) }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">All expenses</a>
   </div>
 </div>
 
@@ -32,6 +27,15 @@
 </a>
 {% endif %}
 
+{% set extra %}
+  <select name="vtype" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">All vehicle types</option>
+    {% for t in types %}<option {{ 'selected' if vtype == t }}>{{ t }}</option>{% endfor %}</select>
+  <select name="show" class="border border-slate-300 rounded-lg px-2 py-2 text-sm">
+    {% for v, l in [('active', 'Active'), ('inactive', 'Inactive'), ('all', 'All')] %}<option value="{{ v }}" {{ 'selected' if show == v }}>{{ l }}</option>{% endfor %}</select>
+  <input name="q" value="{{ q }}" placeholder="Number, model or driver…" class="col-span-2 md:col-span-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+{% endset %}
+{{ range_filter(rng, extra) }}
+<p class="text-xs text-slate-500 -mt-2 mb-3">Totals below count <b>approved</b> expenses in the selected dates.</p>
 {% if true %}
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
   {% for cat, icon in categories.items() %}
@@ -41,7 +45,7 @@
   </div>
   {% endfor %}
   <div class="bg-blue-900 text-white rounded-2xl shadow-sm p-3">
-    <div class="text-[11px] uppercase text-blue-200">Total</div>
+    <div class="text-[11px] uppercase text-blue-200">Total · {{ vehicles|length }} vehicle{{ 's' if vehicles|length != 1 }}</div>
     <div class="text-lg font-bold">{{ grand.total|inr }}</div>
   </div>
 </div>
@@ -64,7 +68,7 @@
       {% set t = totals.get(v.id, {}) %}
       <tr class="{{ 'opacity-50' if not v.active }}">
         <td class="px-4 py-3">
-          <a href="{{ url_for('vehicles.detail', vid=v.id, month=month_value) }}" class="font-semibold text-blue-700">{{ v.number }}</a>
+          <a href="{{ url_for('vehicles.detail', vid=v.id, **rargs) }}" class="font-semibold text-blue-700">{{ v.number }}</a>
           <div class="text-xs text-slate-400">{{ v.vehicle_type }}{% if v.model %} · {{ v.model }}{% endif %}{% if not v.active %} · inactive{% endif %}</div>
         </td>
         <td class="px-4 py-3">{{ v.driver.name if v.driver else '—' }}</td>

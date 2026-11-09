@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="flex flex-wrap items-center justify-between gap-3 mb-2">
-  <h1 class="text-2xl font-bold">Salary — {{ month_label }}</h1>
-  <div class="flex items-center gap-2">
-    <form class="flex flex-wrap gap-2 text-sm">
-      <input type="month" name="month" value="{{ month_value }}" class="border border-slate-300 rounded-lg px-3 py-2">
-      <select name="type" class="border border-slate-300 rounded-lg px-2 py-2"><option value="">All types</option>
-        {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp_type == t }}>{{ t }}</option>{% endfor %}</select>
-      <select name="status" class="border border-slate-300 rounded-lg px-2 py-2">
-        {% for v, l in [('', 'Paid & unpaid'), ('unpaid', 'Not paid yet'), ('paid', 'Paid'), ('changed', 'Attendance changed')] %}<option value="{{ v }}" {{ 'selected' if status == v }}>{{ l }}</option>{% endfor %}</select>
-      <input name="q" value="{{ q }}" placeholder="Name…" class="border border-slate-300 rounded-lg px-3 py-2 w-32">
-      <button class="bg-blue-700 text-white rounded-lg px-4 py-2 font-semibold">Apply</button>
-    </form>
+{% from "_range_filter.html" import range_filter %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+  <h1 class="text-2xl font-bold text-blue-950">Salary — {{ rng.label }}</h1>
+  <div class="flex flex-wrap gap-2">
     <a href="{{ url_for('salary.register', month=month_value) }}" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm">Register</a>
     <a href="{{ url_for('salary.report') }}" class="bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm">📊 Salary &amp; advances report</a>
   </div>
 </div>
+{% set extra %}
+  <select name="type" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">All types</option>
+    {% for t in ['Driver', 'Worker'] %}<option {{ 'selected' if emp_type == t }}>{{ t }}</option>{% endfor %}</select>
+  <select name="status" class="border border-slate-300 rounded-lg px-2 py-2 text-sm">
+    {% for v, l in [('', 'Paid & unpaid'), ('unpaid', 'Not paid yet'), ('paid', 'Paid'), ('changed', 'Attendance changed')] %}<option value="{{ v }}" {{ 'selected' if status == v }}>{{ l }}</option>{% endfor %}</select>
+  <input name="q" value="{{ q }}" placeholder="Name…" class="col-span-2 md:col-span-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+{% endset %}
+{{ range_filter(rng, extra) }}
+<p class="text-xs text-slate-500 -mt-2 mb-3">Pick <b>This week</b> / <b>Last week</b> for weekly pay, a month for monthly pay, or <b>Custom</b> dates. Monthly-salary employees are paid per day (monthly rate ÷ days in that month).</p>
 <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
   <div class="col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-2xl p-4 shadow">
     <div class="text-[11px] uppercase tracking-wide text-blue-200">Net amount to pay</div>
@@ -48,7 +49,8 @@
 
 {% set num = "w-20 border rounded px-2 py-1 text-right" %}
 <form method="post">
-  <input type="hidden" name="month" value="{{ month_value }}">
+  <input type="hidden" name="period_start" value="{{ rng.start.isoformat() }}">
+  <input type="hidden" name="period_end" value="{{ rng.end.isoformat() }}">
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="bg-blue-900 text-blue-50 text-left">
@@ -71,9 +73,9 @@
       <tbody class="divide-y">
         {% for e, c in rows %}
         {% set p = c.existing %}
-        {% set locked = p and not can_change(p.paid_on) %}
-        <tr class="{{ 'bg-amber-50' if c.stale else ('bg-emerald-50' if p) }}" data-row data-gross="{{ c.gross }}">
-          <td class="px-3 py-2">{% if locked %}<span title="Saved on an earlier day – owner only">🔒</span>{% else %}<input type="checkbox" name="pay" value="{{ e.id }}" class="paychk w-4 h-4">{% endif %}</td>
+        {% set locked = (p and not can_change(p.paid_on)) or c.overlap %}
+        <tr class="{{ 'bg-red-50/60' if c.overlap else ('bg-amber-50' if c.stale else ('bg-emerald-50' if p)) }}" data-row data-gross="{{ c.gross }}">
+          <td class="px-3 py-2">{% if c.overlap %}<span title="Already paid for some of these dates">⛔</span>{% elif locked %}<span title="Saved on an earlier day – owner only">🔒</span>{% else %}<input type="checkbox" name="pay" value="{{ e.id }}" class="paychk w-4 h-4">{% endif %}</td>
           <td class="px-3 py-2">
             <a href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}" class="font-medium text-blue-700">{{ e.name }}</a>
             <div class="text-xs text-slate-400">{{ e.rate|inr }}/{{ 'mo' if e.pay_type == 'Monthly' else 'day' }}
@@ -94,6 +96,9 @@
             </select>
           </td>
           <td class="px-3 py-2 whitespace-nowrap">
+            {% if c.overlap %}
+              <div class="text-xs text-red-600 font-semibold whitespace-normal w-36">Already paid for {{ c.overlap.period_label }}</div>
+            {% endif %}
             {% if p %}
               {% if c.stale %}<div class="text-xs text-amber-700 font-semibold">⚠ attendance changed — Save again</div>{% else %}<span class="text-xs text-emerald-700">✓ paid</span>{% endif %}
               <div class="flex gap-2 mt-1">

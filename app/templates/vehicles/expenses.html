@@ -2,7 +2,7 @@
 {% from "vehicles/_status.html" import badge %}
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-  <h1 class="text-2xl font-bold text-blue-950">Vehicle expenses — {{ month_label }}</h1>
+  <h1 class="text-2xl font-bold text-blue-950">Vehicle expenses <span class="text-base font-normal text-slate-500">({{ items|length }})</span></h1>
   <div class="flex gap-2">
     <a href="{{ url_for('vehicles.expense_new') }}" class="bg-blue-700 hover:bg-blue-800 text-white rounded-lg px-4 py-2 text-sm font-semibold">+ Add expense</a>
     {% if true %}
@@ -11,16 +11,31 @@
   </div>
 </div>
 
-<form class="grid grid-cols-2 md:flex md:flex-wrap gap-2 mb-4 text-sm">
-  <input type="month" name="month" value="{{ month_value }}" class="border border-slate-300 rounded-lg px-3 py-2">
-  <select name="vehicle" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">All vehicles</option>
+{% from "_range_filter.html" import range_filter %}
+{% set extra %}
+  <select name="vehicle" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">All vehicles</option>
     {% for v in vehicles %}<option value="{{ v.id }}" {{ 'selected' if args.get('vehicle') == v.id|string }}>{{ v.number }}</option>{% endfor %}</select>
-  <select name="category" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">All types</option>
+  <select name="category" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">All types</option>
     {% for c in categories %}<option {{ 'selected' if args.get('category') == c }}>{{ c }}</option>{% endfor %}</select>
-  <select name="status" class="border border-slate-300 rounded-lg px-3 py-2"><option value="">Any status</option>
-    {% for s in ['Pending', 'Approved', 'Rejected'] %}<option {{ 'selected' if args.get('status') == s }}>{{ s }}</option>{% endfor %}</select>
-  <button class="border border-slate-300 bg-white rounded-lg px-4 py-2 font-semibold">Filter</button>
-</form>
+  <select name="status" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">Any status</option>
+    {% for st in ['Pending', 'Approved', 'Rejected'] %}<option {{ 'selected' if args.get('status') == st }}>{{ st }}</option>{% endfor %}</select>
+  <select name="mode" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">Any payment</option>
+    {% for m in ['Cash', 'UPI', 'Card', 'Credit', 'Bank'] %}<option {{ 'selected' if args.get('mode') == m }}>{{ m }}</option>{% endfor %}</select>
+  <select name="driver" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">Any driver</option>
+    {% for d in drivers %}<option value="{{ d.id }}" {{ 'selected' if args.get('driver') == d.id|string }}>{{ d.name }}</option>{% endfor %}</select>
+  <select name="user" class="border border-slate-300 rounded-lg px-2 py-2 text-sm"><option value="">Entered by anyone</option>
+    {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if args.get('user') == u.id|string }}>{{ u.username }}</option>{% endfor %}</select>
+  <input name="q" value="{{ args.get('q', '') }}" placeholder="Bunk, garage, bill no…" class="col-span-2 md:col-span-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+{% endset %}
+{{ range_filter(rng, extra) }}
+
+<div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+  {% for cat, icon in categories.items() %}
+  <div class="bg-white rounded-2xl border border-slate-200 p-3"><div class="text-[11px] uppercase text-slate-500">{{ icon }} {{ cat }}</div><div class="text-lg font-bold">{{ by_cat[cat]|inr }}</div></div>
+  {% endfor %}
+  <div class="bg-blue-900 text-white rounded-2xl p-3"><div class="text-[11px] uppercase text-blue-200">Approved total</div><div class="text-lg font-bold">{{ total|inr }}</div></div>
+  <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3"><div class="text-[11px] uppercase text-amber-700">Pending</div><div class="text-lg font-bold text-amber-800">{{ pending_total|inr }}</div></div>
+</div>
 
 <!-- phone: cards -->
 <div class="md:hidden space-y-3">
@@ -34,7 +49,7 @@
       <div class="text-right"><div class="font-bold">{{ e.amount|inr }}</div>{{ badge(e.status) }}</div>
     </div>
     <div class="text-xs text-slate-600 mt-1">
-      {% if e.litres %}{{ e.litres|days }} L @ ₹{{ e.rate_per_litre }}{% endif %}{% if e.birds %}{{ e.birds }} birds{% if e.labourers %} · {{ e.labourers }} workers{% endif %}{% endif %}{% if e.odometer %} · {{ e.odometer }} km{% endif %}{% if e.vendor %} · {{ e.vendor }}{% endif %}
+      {% set bits = [] %}{% if e.category == 'Diesel' and e.litres %}{% set _ = bits.append(e.litres|days ~ ' L @ ₹' ~ e.rate_per_litre) %}{% endif %}{% if e.birds %}{% set _ = bits.append(e.birds ~ ' birds' ~ ((' · ' ~ e.labourers ~ ' workers') if e.labourers else '')) %}{% endif %}{% if e.odometer %}{% set _ = bits.append(e.odometer ~ ' km') %}{% endif %}{% if e.vendor %}{% set _ = bits.append(e.vendor) %}{% endif %}{% if e.bill_no %}{% set _ = bits.append('Bill ' ~ e.bill_no) %}{% endif %}{{ bits|join(' · ') }}
       {% if e.description %}<div class="text-slate-400">{{ e.description }}</div>{% endif %}
       {% if e.status == 'Rejected' and e.review_note %}<div class="text-red-600 font-semibold">Reason: {{ e.review_note }}</div>{% endif %}
     </div>
@@ -66,10 +81,7 @@
         <td class="px-3 py-2 font-semibold whitespace-nowrap">{{ e.vehicle.number }}</td>
         <td class="px-3 py-2 whitespace-nowrap">{{ categories[e.category] }} {{ e.category }}</td>
         <td class="px-3 py-2 text-slate-600">
-          {% if e.category == 'Diesel' and e.litres %}{{ e.litres|days }} L @ ₹{{ e.rate_per_litre }}{% endif %}
-          {% if e.category == 'Loading' and e.birds %}{{ e.birds }} birds{% if e.labourers %} · {{ e.labourers }} workers{% endif %}{% endif %}
-          {% if e.odometer %} · {{ e.odometer }} km{% endif %}
-          {% if e.vendor %} · {{ e.vendor }}{% endif %}
+          {% set bits = [] %}{% if e.category == 'Diesel' and e.litres %}{% set _ = bits.append(e.litres|days ~ ' L @ ₹' ~ e.rate_per_litre) %}{% endif %}{% if e.birds %}{% set _ = bits.append(e.birds ~ ' birds' ~ ((' · ' ~ e.labourers ~ ' workers') if e.labourers else '')) %}{% endif %}{% if e.odometer %}{% set _ = bits.append(e.odometer ~ ' km') %}{% endif %}{% if e.vendor %}{% set _ = bits.append(e.vendor) %}{% endif %}{% if e.bill_no %}{% set _ = bits.append('Bill ' ~ e.bill_no) %}{% endif %}{{ bits|join(' · ') }}
           {% if e.description %}<div class="text-xs text-slate-400">{{ e.description }}</div>{% endif %}
           {% if e.status == 'Rejected' and e.review_note %}<div class="text-xs text-red-600">Reason: {{ e.review_note }}</div>{% endif %}
           <div class="text-[11px] text-slate-400">{% if e.created_at %}entered {{ e.created_at|localtime }}{% endif %}{% if e.submitter %} · by {{ e.submitter.username }}{% endif %}</div>

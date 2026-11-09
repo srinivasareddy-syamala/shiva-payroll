@@ -45,7 +45,13 @@ def da_entries(employee, year, month):
 
 
 def calculate(employee, year, month):
-    """Suggested salary for the month (not saved)."""
+    """Suggested salary for a calendar month (kept for compatibility)."""
+    start, end, _ = month_bounds(year, month)
+    return calculate_period(employee, start, end)
+
+
+def _calculate_month_old(employee, year, month):
+    """(old monthly implementation, unused)"""
     s = attendance_summary(employee, year, month)
     rate = Decimal(employee.rate)
     if employee.pay_type == "Monthly":
@@ -79,3 +85,58 @@ def calculate(employee, year, month):
         "existing": existing,
         "stale": stale,
     }
+
+
+# ---------- Any period (week / custom dates / month) ----------
+
+def summary_range(employee, start, end):
+    import calendar as _cal
+    recs = Attendance.query.filter(Attendance.employee_id == employee.id,
+                                   Attendance.date.between(start, end)).all()
+    counts = {k: 0 for k in ATTENDANCE_STATUSES}
+    ot = da = Decimal("0")
+    monthly_earned = Decimal("0")
+    rate = Decimal(employee.rate)
+    for r in recs:
+        counts[r.status] += 1
+        ot += Decimal(r.ot_hours or 0)
+        da += Decimal(r.da_amount or 0)
+        w = ATTENDANCE_STATUSES[r.status][1]
+        if w:
+            monthly_earned += rate / _cal.monthrange(r.date.year, r.date.month)[1] * w
+    paid_days = sum(Decimal(counts[k]) * ATTENDANCE_STATUSES[k][1] for k in counts)
+    return {
+        "counts": counts, "paid_days": paid_days, "ot_hours": ot, "da_amount": money(da),
+        "da_days": sum(1 for r in recs if r.da_amount and r.da_amount > 0),
+        "days_in_month": (end - start).days + 1,      # days in the period
+        "marked_days": len(recs), "_monthly_earned": monthly_earned,
+    }
+
+
+def da_entries_range(employee, start, end):
+    return Attendance.query.filter(Attendance.employee_id == employee.id, Attendance.date.between(start, end),
+                                   Attendance.da_amount > 0).order_by(Attendance.date).all()
+
+
+def calculate_period(employee, start, end):
+    """Suggested salary for start..end (not saved). Monthly salaries are paid per day
+    (monthly rate ÷ days in that month), daily wages = rate × paid days."""
+    s = summary_range(employee, start, end)
+    rate = Decimal(employee.rate)
+    earned = s.pop("_monthly_earned") if employee.pay_type == "Monthly" else rate * s["paid_days"]
+    ot_amount = Decimal(employee.ot_rate) * s["ot_hours"]
+    earned, ot_amount = money(earned), money(ot_amount)
+
+    existing = SalaryPayment.query.filter_by(employee_id=employee.id, period_start=start, period_end=end).first()
+    overlap = SalaryPayment.query.filter(SalaryPayment.employee_id == employee.id,
+                                         SalaryPayment.period_start <= end, SalaryPayment.period_end >= start,
+                                         SalaryPayment.id != (existing.id if existing else 0)).first()
+    outstanding = employee.advance_due_for_period(start, end, exclude_payment_id=existing.id if existing else None)
+    gross = earned + ot_amount + s["da_amount"]
+    suggested_adv = money(max(Decimal("0"), min(outstanding, gross)))
+    stale = bool(existing) and (
+        Decimal(existing.paid_days) != s["paid_days"] or money(existing.earned) != earned
+        or money(existing.ot_amount) != ot_amount or money(existing.da_amount) != s["da_amount"])
+    return {**s, "rate": rate, "earned": earned, "ot_amount": ot_amount, "gross": gross,
+            "advance_outstanding": money(outstanding), "suggested_advance": suggested_adv,
+            "existing": existing, "overlap": overlap, "stale": stale}

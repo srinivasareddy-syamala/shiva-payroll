@@ -104,7 +104,7 @@
       {% for p in pays %}
       <div class="flex flex-wrap justify-between items-center gap-2 px-4 py-2">
         <span>{{ p.paid_on.strftime('%d %b') if p.paid_on }} · <b>{{ p.employee.name }}</b>
-          <span class="text-slate-400 text-xs">for {{ '%02d/%04d'|format(p.month, p.year) }} · {{ p.payment_mode }}</span></span>
+          <span class="text-slate-400 text-xs">for {{ p.period_label }} · {{ p.payment_mode }}</span></span>
         <span class="flex items-center gap-3 whitespace-nowrap"><b>{{ p.net_paid|inr }}</b>
           <a href="{{ url_for('salary.slip', payment_id=p.id) }}" target="_blank" class="text-blue-700 text-xs">Slip</a>
           <a href="{{ url_for('salary.share', payment_id=p.id) }}" class="text-emerald-600 text-xs font-semibold">WhatsApp</a></span>
