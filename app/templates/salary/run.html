@@ -55,7 +55,7 @@
   <div>Gross earned (not paid yet) <b>{{ summary.unpaid_gross|inr }}</b> − advance recovered now <b>{{ summary.unpaid_recovery|inr }}</b> = <b class="text-blue-900">net to pay {{ summary.net_to_pay|inr }}</b></div>
   <div>Advance balance <b>{{ summary.balance_before|inr }}</b> = taken in these dates <b>{{ summary.advance_taken|inr }}</b> + still owed from earlier <b>{{ summary.older_balance|inr }}</b></div>
   <div>Advance balance <b>{{ summary.balance_before|inr }}</b> = recovered now <b>{{ summary.unpaid_recovery|inr }}</b>{% if summary.already_recovered %} + already recovered in saved salaries <b>{{ summary.already_recovered|inr }}</b>{% endif %} + carried to next salary <b>{{ summary.carry_forward|inr }}</b>
-    {% if summary.capped %}<span class="text-amber-700">· {{ summary.capped }} {{ 'employees owe' if summary.capped != 1 else 'employee owes' }} more than they earned, so only their earnings are recovered (marked ⚠ below)</span>{% endif %}</div>
+    {% if summary.capped %}<span class="font-semibold text-red-700">· {{ summary.capped }} {{ 'employees owe' if summary.capped != 1 else 'employee owes' }} more than they earned, so only their earnings are recovered (highlighted in red below)</span>{% endif %}</div>
 </div>
 <p class="text-sm mb-2"><b>{{ counts.total }}</b> employees · <span class="text-emerald-700">{{ counts.paid }} paid</span> · <span class="text-slate-600">{{ counts.total - counts.paid }} not paid</span>{% if counts.changed %} · <span class="text-amber-700">{{ counts.changed }} attendance changed</span>{% endif %}</p>
 <p class="text-sm text-slate-500 mb-4">Tick the employees to pay (header box ticks all shown), then Save. Advance deduction is pre-filled — change it to recover in instalments.</p>
@@ -87,10 +87,12 @@
         {% for e, c in rows %}
         {% set p = c.existing %}
         {% set locked = (p and not can_change(p.paid_on)) or c.overlap %}
-        <tr class="{{ 'bg-red-50/60' if c.overlap else ('bg-amber-50' if c.stale else ('bg-emerald-50' if p)) }}" data-row data-gross="{{ c.gross }}">
-          <td class="px-3 py-2">{% if c.overlap %}<span title="Already paid for some of these dates">⛔</span>{% elif locked %}<span title="Saved on an earlier day – owner only">🔒</span>{% else %}<input type="checkbox" name="pay" value="{{ e.id }}" class="paychk w-4 h-4">{% endif %}</td>
+        {% set owes_more = not p and not c.overlap and c.advance_outstanding > c.gross %}
+        <tr class="{{ 'bg-red-200 hover:bg-red-300' if owes_more else ('bg-red-50/60' if c.overlap else ('bg-amber-50' if c.stale else ('bg-emerald-50' if p))) }}" data-row data-gross="{{ c.gross }}">
+          <td class="px-3 py-2 {{ 'border-l-8 border-red-600' if owes_more }}">{% if c.overlap %}<span title="Already paid for some of these dates">⛔</span>{% elif locked %}<span title="Saved on an earlier day – owner only">🔒</span>{% else %}<input type="checkbox" name="pay" value="{{ e.id }}" class="paychk w-4 h-4">{% endif %}</td>
           <td class="px-3 py-2">
-            <a href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}" class="font-medium text-blue-700">{{ e.name }}</a>
+            <a href="{{ url_for('employees.ledger', emp_id=e.id, month=month_value) }}" class="{{ 'font-extrabold text-red-800' if owes_more else 'font-medium text-blue-700' }}">{{ e.name }}</a>
+            {% if owes_more %}<span class="ml-1 inline-block rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white align-middle">Owes more than earned</span>{% endif %}
             <div class="text-xs text-slate-400">{{ e.rate|inr }}/{{ 'mo' if e.pay_type == 'Monthly' else 'day' }}
               {% if c.marked_days < c.days_in_month %}<span class="text-amber-600">· {{ c.days_in_month - c.marked_days }} day{{ 's' if c.days_in_month - c.marked_days != 1 }} unmarked</span>{% endif %}</div>
           </td>
@@ -101,7 +103,7 @@
           <td class="px-3 py-2 text-right"><input name="bonus_{{ e.id }}" value="{{ p.bonus if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="bonus"></td>
           <td class="px-3 py-2 text-right text-red-600">{{ c.advance_outstanding|inr }}
             {% if c.advance_taken %}<div class="text-[11px] text-orange-600">taken {{ c.advance_taken|inr }} in these dates</div>{% endif %}
-            {% if not p and c.advance_outstanding > c.gross %}<div class="text-[11px] text-amber-700" title="Advance is more than earnings; the rest carries forward">⚠ {{ (c.advance_outstanding - c.suggested_advance)|inr }} carries forward</div>{% endif %}</td>
+            {% if owes_more %}<div class="text-xs font-bold text-red-800" title="Advance is more than earnings; the rest carries forward">⚠ {{ (c.advance_outstanding - c.suggested_advance)|inr }} carries forward</div>{% endif %}</td>
           <td class="px-3 py-2 text-right"><input name="adv_{{ e.id }}" value="{{ p.advance_deducted if p else c.suggested_advance }}" inputmode="decimal" class="{{ num }} calc" data-k="adv"></td>
           <td class="px-3 py-2 text-right"><input name="other_{{ e.id }}" value="{{ p.other_deductions if p else 0 }}" inputmode="decimal" class="{{ num }} calc" data-k="other"></td>
           <td class="px-3 py-2 text-right font-bold net"></td>
