@@ -6,6 +6,7 @@ where docker >nul 2>nul
 if errorlevel 1 goto :no_docker
 docker info >nul 2>nul
 if errorlevel 1 goto :not_running
+if not exist ".env" goto :no_env
 echo Starting PostgreSQL and the app (first time downloads images, 2-5 minutes)...
 docker compose up -d --build
 if errorlevel 1 goto :fail
@@ -23,13 +24,19 @@ echo.
 echo ========================================================
 echo   App is running:  http://localhost:5000
 for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-NetIPConfiguration | Where-Object {$_.IPv4DefaultGateway} | Select-Object -First 1).IPv4Address.IPAddress"') do echo   Phones on same Wi-Fi:  http://%%a:5000
-echo   Login: admin / admin123  (change in docker-compose.yml before first start)
 echo   It keeps running in the background - you can close this window.
 echo   To stop: double-click docker-stop.bat
 echo ========================================================
 start "" http://localhost:5000
 pause
 exit /b 0
+
+:no_env
+echo [ERROR] The settings file .env is missing.
+echo   Copy .env.example to .env, open it in Notepad and fill in POSTGRES_PASSWORD and SECRET_KEY.
+echo   If you already have data, POSTGRES_PASSWORD must be the password the database was created with.
+pause
+exit /b 1
 
 :no_docker
 echo [ERROR] Docker is not installed.

@@ -1,20 +1,20 @@
-# Shiva Traders Payroll - PostgreSQL + app
-# Start:  docker compose up -d --build      Stop: docker compose down
-# Change the passwords below BEFORE the first start.
+# Shiva Agrovet Payroll - PostgreSQL + app
+# Secrets are NOT stored here. They come from environment variables:
+#   - on your PC: a file named .env next to this file (see .env.example; never commit it)
+#   - on Dokploy: the app's "Environment" tab (Dokploy writes them to .env)
+# Start: docker compose up -d --build      Stop: docker compose down
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Shiva@db2026
-      POSTGRES_DB: shiva_payroll
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env / Dokploy Environment}
+      POSTGRES_DB: ${POSTGRES_DB:-shiva_payroll}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"          # for pgAdmin/DBeaver on this PC: localhost:5433
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d shiva_payroll"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -26,18 +26,21 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://postgres:Shiva%40db2026@db:5432/shiva_payroll
-      SECRET_KEY: change-this-to-a-long-random-string-9f3k2l
-      COMPANY_NAME: Shiva Traders
-      COMPANY_ADDRESS: ""
-      ADMIN_USER: admin              # first owner login (created once)
-      ADMIN_PASSWORD: admin123       # change after first login
-      TZ: IST-5:30            # India time (works without tzdata)
-      UPLOAD_FOLDER: /app/uploads    # diesel / repair bill photos
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env / Dokploy Environment}
+      POSTGRES_DB: ${POSTGRES_DB:-shiva_payroll}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env / Dokploy Environment}
+      COMPANY_NAME: ${COMPANY_NAME:-Shiva Agrovet}
+      COMPANY_ADDRESS: ${COMPANY_ADDRESS:-}
+      ADMIN_USER: ${ADMIN_USER:-admin}           # first owner login, created only if no owner exists
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}         # leave empty once an owner exists
+      TZ: IST-5:30
+      UPLOAD_FOLDER: /app/uploads
     volumes:
       - uploads:/app/uploads
     ports:
-      - "5000:5000"
+      - "${WEB_PORT:-5000}:5000"
 
 volumes:
   pgdata:

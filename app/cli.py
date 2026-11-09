@@ -54,7 +54,10 @@ def register_cli(app):
             click.echo("Owner already exists.")
             return
         username = os.environ.get("ADMIN_USER", "admin")
-        password = os.environ.get("ADMIN_PASSWORD", "admin123")
+        password = os.environ.get("ADMIN_PASSWORD", "")
+        if len(password) < 6:
+            click.echo("No owner yet. Set ADMIN_PASSWORD (min 6 chars) in the environment to create the first owner login.")
+            return
         u = User(username=username, role="owner")
         u.set_password(password)
         db.session.add(u)
